@@ -1,0 +1,13 @@
+{
+  "description": "我的 NuGet 套件清單",
+  "packages": [
+    "microsoft.data.sqlclient.6.0.2.nupkg",
+    "microsoft.extensions.configuration.9.0.5.nupkg",
+    "microsoft.extensions.configuration.abstractions.9.0.5.nupkg",
+    "microsoft.extensions.configuration.binder.9.0.5.nupkg",
+    "microsoft.extensions.configuration.fileextensions.9.0.5.nupkg",
+    "microsoft.extensions.configuration.json.9.0.5.nupkg",
+    "microsoft.extensions.dependencyinjection.9.0.5.nupkg",
+    "microsoft.extensions.dependencyinjection.abstractions.9.0.5.nupkg"
+  ]
+}

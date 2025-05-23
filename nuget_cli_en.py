@@ -10,11 +10,13 @@ import os
 import json
 import csv
 import time
+import ast
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import requests
-from vulnerability_checker import VulnerabilityChecker
+from vulnerability_checker_en import VulnerabilityChecker
 
 class Colors:
     """Terminal color definitions"""
@@ -29,85 +31,9 @@ class Colors:
     UNDERLINE = '\033[4m'
     END = '\033[0m'
 
-class EnhancedVulnerabilityChecker(VulnerabilityChecker):
-    """Enhanced vulnerability checker that collects all findings from all sources"""
-    
-    def check_vulnerabilities_comprehensive(self, packages: List[str]) -> List[Dict]:
-        """Check vulnerabilities from all sources and return comprehensive results"""
-        all_vulnerabilities = []
-        
-        for package in packages:
-            package = package.strip()
-            if not package:
-                continue
-            
-            name, version = self.parse_package_name(package)
-            print(f"Checking package: {name} (version: {version or 'unspecified'})")
-            
-            # Check each source individually and collect all results
-            sources_results = {}
-            
-            # NVD
-            try:
-                nvd_results = self.search_nvd(name, version)
-                sources_results['NVD'] = nvd_results
-                print(f"  NVD: Found {len(nvd_results)} vulnerabilities")
-            except Exception as e:
-                print(f"  NVD: Error - {e}")
-                sources_results['NVD'] = []
-            
-            # OSV
-            try:
-                osv_results = self.search_osv(name, version)
-                sources_results['OSV'] = osv_results
-                print(f"  OSV: Found {len(osv_results)} vulnerabilities")
-            except Exception as e:
-                print(f"  OSV: Error - {e}")
-                sources_results['OSV'] = []
-            
-            # GitHub Advisory
-            try:
-                github_results = self.search_github_advisory(name, version)
-                sources_results['GitHub'] = github_results
-                print(f"  GitHub Advisory: Found {len(github_results)} vulnerabilities")
-            except Exception as e:
-                print(f"  GitHub Advisory: Error - {e}")
-                sources_results['GitHub'] = []
-            
-            # Snyk
-            try:
-                snyk_results = self.search_snyk(name, version)
-                sources_results['Snyk'] = snyk_results
-                print(f"  Snyk: Found {len(snyk_results)} vulnerabilities")
-            except Exception as e:
-                print(f"  Snyk: Error - {e}")
-                sources_results['Snyk'] = []
-            
-            # Combine all results
-            for source, results in sources_results.items():
-                for vuln in results:
-                    vuln['package'] = name
-                    vuln['package_version'] = version
-                    vuln['source'] = source
-                    all_vulnerabilities.append(vuln)
-        
-        # Remove duplicates based on CVE ID and package
-        seen = set()
-        unique_vulnerabilities = []
-        for vuln in all_vulnerabilities:
-            key = (vuln.get('package'), vuln.get('cve_id'), vuln.get('source'))
-            if key not in seen:
-                seen.add(key)
-                unique_vulnerabilities.append(vuln)
-        
-        # Sort by CVSS score (high to low)
-        unique_vulnerabilities.sort(key=lambda x: x.get('cvss_score', 0), reverse=True)
-        
-        return unique_vulnerabilities
-
 class NuGetCLI:
     def __init__(self):
-        self.checker = EnhancedVulnerabilityChecker()
+        self.checker = VulnerabilityChecker()
         self.start_time = None
         
     def print_banner(self):
@@ -137,6 +63,67 @@ class NuGetCLI:
             'UNKNOWN': Colors.CYAN
         }
         return severity_colors.get(severity.upper(), Colors.WHITE)
+    
+    def parse_package_list_format(self, list_string: str) -> List[str]:
+        """Parse Python list format package list"""
+        packages = []
+        
+        try:
+            # Clean input string, remove extra whitespace and newlines
+            cleaned_string = re.sub(r'\s+', ' ', list_string.strip())
+            
+            # Try to parse directly as Python list
+            try:
+                parsed_list = ast.literal_eval(cleaned_string)
+                if isinstance(parsed_list, list):
+                    packages = [str(pkg).strip() for pkg in parsed_list if pkg]
+                    self.print_colored(f"✅ Successfully parsed Python list format, found {len(packages)} packages", Colors.GREEN)
+                    return packages
+            except (ValueError, SyntaxError):
+                pass
+            
+            # If direct parsing fails, try to extract list content
+            # Look for [...] format
+            list_match = re.search(r'\[(.*?)\]', cleaned_string, re.DOTALL)
+            if list_match:
+                list_content = list_match.group(1)
+                
+                # Split items, support single quotes, double quotes or no quotes
+                items = re.findall(r"['\"]([^'\"]+)['\"]|([^,\s]+)", list_content)
+                
+                for item in items:
+                    # item is a tuple, take the non-empty part
+                    pkg = item[0] if item[0] else item[1]
+                    if pkg and pkg.strip():
+                        packages.append(pkg.strip())
+                
+                if packages:
+                    self.print_colored(f"✅ Successfully parsed list format, found {len(packages)} packages", Colors.GREEN)
+                    return packages
+            
+            # If still fails, try splitting by comma
+            if ',' in cleaned_string:
+                # Remove brackets
+                content = re.sub(r'[\[\]]', '', cleaned_string)
+                # Split and clean
+                items = [item.strip().strip('\'"') for item in content.split(',')]
+                packages = [item for item in items if item and not item.isspace()]
+                
+                if packages:
+                    self.print_colored(f"✅ Parsed by comma separation, found {len(packages)} packages", Colors.GREEN)
+                    return packages
+            
+            # Last attempt: assume it's a single package
+            cleaned = re.sub(r'[\[\]\'""]', '', cleaned_string).strip()
+            if cleaned:
+                packages = [cleaned]
+                self.print_colored(f"✅ Parsed as single package: {cleaned}", Colors.GREEN)
+                return packages
+                
+        except Exception as e:
+            self.print_colored(f"⚠️  Error parsing list format: {e}", Colors.YELLOW)
+        
+        return packages
     
     def parse_packages_from_file(self, file_path: str) -> List[str]:
         """Parse package list from file"""
@@ -299,40 +286,33 @@ class NuGetCLI:
         self.print_colored("🔍 VULNERABILITIES FOUND", Colors.RED, bold=True)
         print("="*80)
         
-        current_package = None
-        vuln_count = 0
-        
-        for vuln in vulnerabilities:
-            package_name = vuln.get('package', 'Unknown')
-            
-            # Group by package
-            if package_name != current_package:
-                if current_package is not None:
-                    print()
-                current_package = package_name
-                self.print_colored(f"\n📦 Package: {package_name} (v{vuln.get('package_version', 'N/A')})", 
-                                 Colors.BLUE, bold=True)
-                print("-" * 60)
-            
-            vuln_count += 1
+        for i, vuln in enumerate(vulnerabilities, 1):
             severity_color = self.get_severity_color(vuln.get('severity', 'UNKNOWN'))
+            is_conservative = vuln.get('is_conservative_match', False)
             
-            print(f"\n  [{vuln_count}] {Colors.BOLD}{vuln.get('cve_id', 'N/A')}{Colors.END}")
-            print(f"      🚨 Severity: {severity_color}{Colors.BOLD}{vuln.get('severity', 'UNKNOWN')}{Colors.END}")
-            print(f"      📊 CVSS Score: {Colors.BOLD}{vuln.get('cvss_score', 'N/A')}{Colors.END}")
-            print(f"      🌐 Source: {Colors.BLUE}{vuln.get('source', 'Unknown')}{Colors.END}")
+            print(f"\n{Colors.BOLD}[{i}] {vuln.get('package', 'Unknown')}{Colors.END}")
+            print(f"    🆔 CVE ID: {Colors.CYAN}{vuln.get('cve_id', 'N/A')}{Colors.END}")
+            print(f"    📊 CVSS Score: {Colors.BOLD}{vuln.get('cvss_score', 'N/A')}{Colors.END}")
+            print(f"    🚨 Severity: {severity_color}{Colors.BOLD}{vuln.get('severity', 'UNKNOWN')}{Colors.END}")
+            print(f"    📦 Package Version: {Colors.YELLOW}{vuln.get('package_version', 'N/A')}{Colors.END}")
+            print(f"    🌐 Data Source: {Colors.BLUE}{Colors.BOLD}{vuln.get('source', 'Unknown')}{Colors.END}")
+            
+            # Highlight conservative judgment cases
+            if is_conservative:
+                print(f"    {Colors.YELLOW}{Colors.BOLD}⚠️  Note: Package name matches but no specific version range found, using conservative judgment{Colors.END}")
             
             if detailed:
                 description = vuln.get('description', 'N/A')
-                if len(description) > 150:
-                    description = description[:150] + "..."
-                print(f"      📝 Description: {description}")
+                if len(description) > 100:
+                    description = description[:100] + "..."
+                print(f"    📝 Description: {description}")
+                # Highlight links
+                print(f"    🔗 Link: {Colors.CYAN}{Colors.UNDERLINE}{Colors.BOLD}{vuln.get('link', 'N/A')}{Colors.END}")
+            else:
+                # Show highlighted links even in non-detailed mode
+                print(f"    🔗 Link: {Colors.CYAN}{Colors.UNDERLINE}{Colors.BOLD}{vuln.get('link', 'N/A')}{Colors.END}")
             
-            link = vuln.get('link', 'N/A')
-            if link != 'N/A':
-                print(f"      🔗 Details: {Colors.UNDERLINE}{link}{Colors.END}")
-            
-            print(f"      {'-'*50}")
+            print(f"    {'-'*60}")
     
     def export_results(self, vulnerabilities: List[Dict], output_file: str, format_type: str):
         """Export results to file"""
@@ -522,6 +502,13 @@ class NuGetCLI:
         if args.packages:
             packages.extend([pkg.strip() for pkg in args.packages.split(',')])
         
+        # From Python list format
+        if args.list_format:
+            list_packages = self.parse_package_list_format(args.list_format)
+            packages.extend(list_packages)
+            if not args.quiet:
+                self.print_colored(f"📋 Loaded {len(list_packages)} packages from list format", Colors.BLUE)
+        
         # From file
         if args.file:
             file_packages = self.parse_packages_from_file(args.file)
@@ -553,7 +540,7 @@ class NuGetCLI:
         
         # Execute vulnerability check
         try:
-            vulnerabilities = self.checker.check_vulnerabilities_comprehensive(packages)
+            vulnerabilities = self.checker.check_vulnerabilities(packages)
             
             # Display results
             if not args.quiet:
@@ -624,11 +611,18 @@ Usage Examples:
   %(prog)s -f packages.txt -o report.json
   %(prog)s --scan-dir ./MyProject -v --format html -o report.html
   %(prog)s -p "serilog.4.3.0" --fail-on-vuln
+  %(prog)s --list "['microsoft.data.sqlclient.6.0.2.nupkg', 'newtonsoft.json.13.0.1.nupkg']"
+  
+Supported Input Formats:
+  • -p/--packages: Comma-separated package list
+  • --list: Python list format (e.g: "['pkg1.nupkg', 'pkg2.nupkg']")
+  • -f/--file: Read from file (.txt, .json, .csv)
+  • --scan-dir: Scan directory for package files
   
 Supported File Formats:
   • .txt - One package name per line
-  • .json - JSON formatted package list
-  • .csv - CSV formatted package list
+  • .json - JSON format package list
+  • .csv - CSV format package list
   
 Output Formats:
   • json - JSON format report
@@ -640,7 +634,9 @@ Output Formats:
     # Input options
     input_group = parser.add_argument_group('Input Options')
     input_group.add_argument('-p', '--packages', 
-                           help='Package list, comma separated (e.g., "pkg1.1.0,pkg2.2.0")')
+                           help='Package list, comma-separated (e.g: "pkg1.1.0,pkg2.2.0")')
+    input_group.add_argument('--list', dest='list_format',
+                           help='Python list format package list (e.g: "[\'pkg1.nupkg\', \'pkg2.nupkg\']")')
     input_group.add_argument('-f', '--file', 
                            help='Read package list from file (.txt, .json, .csv)')
     input_group.add_argument('--scan-dir', 
@@ -672,7 +668,7 @@ Output Formats:
         return 0
     
     # Check if any input is provided
-    if not any([args.packages, args.file, args.scan_dir]):
+    if not any([args.packages, args.list_format, args.file, args.scan_dir]):
         parser.print_help()
         return 1
     

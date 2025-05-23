@@ -10,6 +10,8 @@ import os
 import json
 import csv
 import time
+import ast
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -61,6 +63,67 @@ class NuGetCLI:
             'UNKNOWN': Colors.CYAN
         }
         return severity_colors.get(severity.upper(), Colors.WHITE)
+    
+    def parse_package_list_format(self, list_string: str) -> List[str]:
+        """解析 Python 列表格式的套件清單"""
+        packages = []
+        
+        try:
+            # 清理輸入字串，移除多餘的空白和換行
+            cleaned_string = re.sub(r'\s+', ' ', list_string.strip())
+            
+            # 嘗試直接解析為 Python 列表
+            try:
+                parsed_list = ast.literal_eval(cleaned_string)
+                if isinstance(parsed_list, list):
+                    packages = [str(pkg).strip() for pkg in parsed_list if pkg]
+                    self.print_colored(f"✅ 成功解析 Python 列表格式，找到 {len(packages)} 個套件", Colors.GREEN)
+                    return packages
+            except (ValueError, SyntaxError):
+                pass
+            
+            # 如果直接解析失敗，嘗試提取列表內容
+            # 尋找 [...] 格式
+            list_match = re.search(r'\[(.*?)\]', cleaned_string, re.DOTALL)
+            if list_match:
+                list_content = list_match.group(1)
+                
+                # 分割項目，支援單引號、雙引號或無引號
+                items = re.findall(r"['\"]([^'\"]+)['\"]|([^,\s]+)", list_content)
+                
+                for item in items:
+                    # item 是一個 tuple，取非空的部分
+                    pkg = item[0] if item[0] else item[1]
+                    if pkg and pkg.strip():
+                        packages.append(pkg.strip())
+                
+                if packages:
+                    self.print_colored(f"✅ 成功解析列表格式，找到 {len(packages)} 個套件", Colors.GREEN)
+                    return packages
+            
+            # 如果還是失敗，嘗試按逗號分割
+            if ',' in cleaned_string:
+                # 移除方括號
+                content = re.sub(r'[\[\]]', '', cleaned_string)
+                # 分割並清理
+                items = [item.strip().strip('\'"') for item in content.split(',')]
+                packages = [item for item in items if item and not item.isspace()]
+                
+                if packages:
+                    self.print_colored(f"✅ 按逗號分割解析，找到 {len(packages)} 個套件", Colors.GREEN)
+                    return packages
+            
+            # 最後嘗試：假設是單個套件
+            cleaned = re.sub(r'[\[\]\'""]', '', cleaned_string).strip()
+            if cleaned:
+                packages = [cleaned]
+                self.print_colored(f"✅ 解析為單個套件: {cleaned}", Colors.GREEN)
+                return packages
+                
+        except Exception as e:
+            self.print_colored(f"⚠️  解析列表格式時發生錯誤: {e}", Colors.YELLOW)
+        
+        return packages
     
     def parse_packages_from_file(self, file_path: str) -> List[str]:
         """從檔案解析套件清單"""
@@ -222,20 +285,29 @@ class NuGetCLI:
         
         for i, vuln in enumerate(vulnerabilities, 1):
             severity_color = self.get_severity_color(vuln.get('severity', 'UNKNOWN'))
+            is_conservative = vuln.get('is_conservative_match', False)
             
             print(f"\n{Colors.BOLD}[{i}] {vuln.get('package', 'Unknown')}{Colors.END}")
             print(f"    🆔 CVE ID: {Colors.CYAN}{vuln.get('cve_id', 'N/A')}{Colors.END}")
             print(f"    📊 CVSS 分數: {Colors.BOLD}{vuln.get('cvss_score', 'N/A')}{Colors.END}")
             print(f"    🚨 嚴重程度: {severity_color}{Colors.BOLD}{vuln.get('severity', 'UNKNOWN')}{Colors.END}")
             print(f"    📦 套件版本: {Colors.YELLOW}{vuln.get('package_version', 'N/A')}{Colors.END}")
-            print(f"    🌐 資料來源: {Colors.BLUE}{vuln.get('source', 'Unknown')}{Colors.END}")
+            print(f"    🌐 資料來源: {Colors.BLUE}{Colors.BOLD}{vuln.get('source', 'Unknown')}{Colors.END}")
+            
+            # 高亮顯示保守判斷的情況
+            if is_conservative:
+                print(f"    {Colors.YELLOW}{Colors.BOLD}⚠️  注意: 套件名稱匹配但無明確版本範圍，採保守判斷{Colors.END}")
             
             if detailed:
                 description = vuln.get('description', 'N/A')
                 if len(description) > 100:
                     description = description[:100] + "..."
                 print(f"    📝 描述: {description}")
-                print(f"    🔗 連結: {Colors.UNDERLINE}{vuln.get('link', 'N/A')}{Colors.END}")
+                # 高亮顯示連結
+                print(f"    🔗 連結: {Colors.CYAN}{Colors.UNDERLINE}{Colors.BOLD}{vuln.get('link', 'N/A')}{Colors.END}")
+            else:
+                # 即使在非詳細模式下也顯示高亮的連結
+                print(f"    🔗 連結: {Colors.CYAN}{Colors.UNDERLINE}{Colors.BOLD}{vuln.get('link', 'N/A')}{Colors.END}")
             
             print(f"    {'-'*60}")
     
@@ -301,6 +373,9 @@ class NuGetCLI:
         .severity-medium { background-color: #f39c12; color: white; }
         .severity-low { background-color: #27ae60; color: white; }
         .badge { padding: 4px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; }
+        .conservative-warning { background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .highlighted-link { color: #007bff; font-weight: bold; text-decoration: underline; }
+        .highlighted-link:hover { color: #0056b3; }
         .footer { text-align: center; margin-top: 30px; color: #7f8c8d; font-size: 14px; }
     </style>
 </head>
@@ -337,6 +412,16 @@ class NuGetCLI:
         for vuln in vulnerabilities:
             severity = vuln.get('severity', 'UNKNOWN').lower()
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            is_conservative = vuln.get('is_conservative_match', False)
+            
+            # 保守判斷警告
+            conservative_warning = ""
+            if is_conservative:
+                conservative_warning = """
+                    <div class="conservative-warning">
+                        ⚠️ <strong>注意:</strong> 套件名稱匹配但無明確版本範圍，採保守判斷
+                    </div>
+                """
             
             vuln_html += f"""
             <div class="vulnerability {severity}">
@@ -347,9 +432,10 @@ class NuGetCLI:
                 <div class="vuln-body">
                     <p><strong>CVSS 分數:</strong> {vuln.get('cvss_score', 'N/A')}</p>
                     <p><strong>套件版本:</strong> {vuln.get('package_version', 'N/A')}</p>
-                    <p><strong>資料來源:</strong> {vuln.get('source', 'Unknown')}</p>
+                    <p><strong>資料來源:</strong> <strong>{vuln.get('source', 'Unknown')}</strong></p>
                     <p><strong>描述:</strong> {vuln.get('description', 'N/A')}</p>
-                    <p><strong>詳細資訊:</strong> <a href="{vuln.get('link', '#')}" target="_blank">查看詳情</a></p>
+                    <p><strong>詳細資訊:</strong> <a href="{vuln.get('link', '#')}" target="_blank" class="highlighted-link">🔗 查看詳情</a></p>
+                    {conservative_warning}
                 </div>
             </div>
             """
@@ -377,6 +463,13 @@ class NuGetCLI:
         # 從命令行參數
         if args.packages:
             packages.extend([pkg.strip() for pkg in args.packages.split(',')])
+        
+        # 從 Python 列表格式
+        if args.list_format:
+            list_packages = self.parse_package_list_format(args.list_format)
+            packages.extend(list_packages)
+            if not args.quiet:
+                self.print_colored(f"📋 從列表格式載入 {len(list_packages)} 個套件", Colors.BLUE)
         
         # 從檔案
         if args.file:
@@ -478,6 +571,13 @@ def main():
   %(prog)s -f packages.txt -o report.json
   %(prog)s --scan-dir ./MyProject -v --format html -o report.html
   %(prog)s -p "serilog.4.3.0" --fail-on-vuln
+  %(prog)s --list "['microsoft.data.sqlclient.6.0.2.nupkg', 'newtonsoft.json.13.0.1.nupkg']"
+  
+支援的輸入格式:
+  • -p/--packages: 逗號分隔的套件清單
+  • --list: Python 列表格式 (例: "['pkg1.nupkg', 'pkg2.nupkg']")
+  • -f/--file: 從檔案讀取 (.txt, .json, .csv)
+  • --scan-dir: 掃描目錄尋找套件檔案
   
 支援的檔案格式:
   • .txt - 每行一個套件名稱
@@ -495,6 +595,8 @@ def main():
     input_group = parser.add_argument_group('輸入選項')
     input_group.add_argument('-p', '--packages', 
                            help='套件清單，用逗號分隔 (例: "pkg1.1.0,pkg2.2.0")')
+    input_group.add_argument('--list', dest='list_format',
+                           help='Python 列表格式的套件清單 (例: "[\'pkg1.nupkg\', \'pkg2.nupkg\']")')
     input_group.add_argument('-f', '--file', 
                            help='從檔案讀取套件清單 (.txt, .json, .csv)')
     input_group.add_argument('--scan-dir', 
@@ -526,7 +628,7 @@ def main():
         return 0
     
     # 檢查是否有輸入
-    if not any([args.packages, args.file, args.scan_dir]):
+    if not any([args.packages, args.list_format, args.file, args.scan_dir]):
         parser.print_help()
         return 1
     
