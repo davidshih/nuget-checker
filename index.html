@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NuGet 套件漏洞檢查器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 NuGet 套件漏洞檢查器</h1>
+            <p>檢查 NuGet 套件的安全漏洞，支援多個安全資料庫查詢</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <h2>輸入套件清單</h2>
+                <div class="input-group">
+                    <label for="packages">套件名稱（逗號分隔）：</label>
+                    <textarea 
+                        id="packages" 
+                        placeholder="例如：serilog.4.3.0.nupkg, newtonsoft.json.13.0.1.nupkg, microsoft.extensions.logging.2.1.0.nupkg"
+                        rows="4"
+                    ></textarea>
+                </div>
+                
+                <div class="button-group">
+                    <button id="checkBtn" onclick="checkVulnerabilities()">
+                        <span id="btnText">🔍 開始檢查</span>
+                        <span id="loadingSpinner" class="spinner" style="display: none;">⏳ 檢查中...</span>
+                    </button>
+                    <button id="clearBtn" onclick="clearResults()">🗑️ 清除結果</button>
+                </div>
+            </div>
+
+            <div id="results" class="results-section" style="display: none;">
+                <h2>檢查結果</h2>
+                <div id="summary" class="summary"></div>
+                <div id="vulnerabilities" class="vulnerabilities"></div>
+            </div>
+
+            <div id="error" class="error-section" style="display: none;">
+                <h3>❌ 錯誤</h3>
+                <p id="errorMessage"></p>
+            </div>
+        </main>
+
+        <footer>
+            <div class="info-section">
+                <h3>📊 支援的安全資料庫</h3>
+                <ul>
+                    <li><strong>NVD</strong> - National Vulnerability Database (美國國家漏洞資料庫)</li>
+                    <li><strong>OSV</strong> - Open Source Vulnerabilities (Google 開源漏洞資料庫)</li>
+                    <li><strong>GitHub Advisory</strong> - GitHub 安全建議資料庫</li>
+                    <li><strong>Snyk</strong> - Snyk 漏洞資料庫</li>
+                </ul>
+                
+                <h3>📝 使用說明</h3>
+                <ul>
+                    <li>輸入 NuGet 套件名稱，支援 .nupkg 格式</li>
+                    <li>多個套件請用逗號分隔</li>
+                    <li>系統會自動解析套件名稱和版本號</li>
+                    <li>只顯示 CVSS 分數 ≥ 4.0 的中高風險漏洞</li>
+                    <li>結果按 CVSS 分數由高到低排序</li>
+                </ul>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        async function checkVulnerabilities() {
+            const packagesInput = document.getElementById('packages').value.trim();
+            const checkBtn = document.getElementById('checkBtn');
+            const btnText = document.getElementById('btnText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const resultsDiv = document.getElementById('results');
+            const errorDiv = document.getElementById('error');
+            
+            // 清除之前的結果
+            resultsDiv.style.display = 'none';
+            errorDiv.style.display = 'none';
+            
+            if (!packagesInput) {
+                showError('請輸入至少一個套件名稱');
+                return;
+            }
+            
+            // 顯示載入狀態
+            checkBtn.disabled = true;
+            btnText.style.display = 'none';
+            loadingSpinner.style.display = 'inline';
+            
+            try {
+                const response = await fetch('/check', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        packages: packagesInput
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    showError(data.error || '檢查失敗');
+                }
+                
+            } catch (error) {
+                console.error('請求錯誤:', error);
+                showError('網路錯誤，請檢查伺服器是否正常運行');
+            } finally {
+                // 恢復按鈕狀態
+                checkBtn.disabled = false;
+                btnText.style.display = 'inline';
+                loadingSpinner.style.display = 'none';
+            }
+        }
+        
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            const summaryDiv = document.getElementById('summary');
+            const vulnerabilitiesDiv = document.getElementById('vulnerabilities');
+            
+            // 顯示摘要
+            summaryDiv.innerHTML = `
+                <div class="summary-stats">
+                    <div class="stat">
+                        <span class="stat-number">${data.total_packages}</span>
+                        <span class="stat-label">檢查套件</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">${data.total_vulnerabilities}</span>
+                        <span class="stat-label">發現漏洞</span>
+                    </div>
+                </div>
+            `;
+            
+            // 顯示漏洞詳情
+            if (data.vulnerabilities.length === 0) {
+                vulnerabilitiesDiv.innerHTML = `
+                    <div class="no-vulnerabilities">
+                        <h3>✅ 太好了！</h3>
+                        <p>在檢查的套件中沒有發現中高風險漏洞。</p>
+                    </div>
+                `;
+            } else {
+                let vulnerabilitiesHtml = '<div class="vulnerabilities-table">';
+                vulnerabilitiesHtml += `
+                    <div class="table-header">
+                        <div class="col-package">套件</div>
+                        <div class="col-cve">CVE 編號</div>
+                        <div class="col-score">CVSS 分數</div>
+                        <div class="col-severity">嚴重程度</div>
+                        <div class="col-source">來源</div>
+                        <div class="col-description">描述</div>
+                        <div class="col-link">連結</div>
+                    </div>
+                `;
+                
+                data.vulnerabilities.forEach(vuln => {
+                    const severityClass = getSeverityClass(vuln.severity);
+                    vulnerabilitiesHtml += `
+                        <div class="table-row">
+                            <div class="col-package">
+                                <strong>${vuln.package}</strong>
+                                ${vuln.package_version ? `<br><small>v${vuln.package_version}</small>` : ''}
+                            </div>
+                            <div class="col-cve">${vuln.cve_id}</div>
+                            <div class="col-score">
+                                <span class="cvss-score ${severityClass}">${vuln.cvss_score}</span>
+                            </div>
+                            <div class="col-severity">
+                                <span class="severity ${severityClass}">${vuln.severity}</span>
+                            </div>
+                            <div class="col-source">
+                                <span class="source-badge">${vuln.source}</span>
+                            </div>
+                            <div class="col-description">
+                                <div class="description-text">${truncateText(vuln.description, 100)}</div>
+                            </div>
+                            <div class="col-link">
+                                <a href="${vuln.link}" target="_blank" class="link-btn">查看詳情</a>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                vulnerabilitiesHtml += '</div>';
+                vulnerabilitiesDiv.innerHTML = vulnerabilitiesHtml;
+            }
+            
+            resultsDiv.style.display = 'block';
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            errorMessage.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function clearResults() {
+            document.getElementById('packages').value = '';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+        }
+        
+        function getSeverityClass(severity) {
+            switch (severity?.toUpperCase()) {
+                case 'CRITICAL': return 'critical';
+                case 'HIGH': return 'high';
+                case 'MEDIUM': return 'medium';
+                case 'LOW': return 'low';
+                default: return 'unknown';
+            }
+        }
+        
+        function truncateText(text, maxLength) {
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
+        
+        // 支援 Enter 鍵提交
+        document.getElementById('packages').addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === 'Enter') {
+                checkVulnerabilities();
+            }
+        });
+    </script>
+</body>
+</html>
