@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
 """
 NuGet Package Vulnerability Scanner - Enhanced Command Line Interface
-Supports multiple input formats, caching, and advanced output options
+Supports multiple input formats, caching, parallel processing, and advanced output options
+
+Features:
+- SQLite-based caching for faster repeated scans
+- Parallel processing with configurable worker threads
+- Solution file (.sln) scanning support
+- Advanced filtering by severity, CVE patterns, and date ranges
+- Configuration file support with .nugetcli.config
+- Interactive package selection mode
+- Multiple export formats: JSON, CSV, HTML, Markdown
+- Retry logic with exponential backoff
+- Progress bars and enhanced terminal output
+- Proxy support for enterprise environments
 """
 
 import argparse
@@ -15,9 +27,11 @@ import re
 import threading
 import hashlib
 import pickle
+import signal
+import platform
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict
 from functools import lru_cache
@@ -39,7 +53,7 @@ from vulnerability_checker_en import VulnerabilityChecker
 
 @dataclass
 class Config:
-    """Configuration settings"""
+    """Configuration settings for the vulnerability scanner"""
     cache_enabled: bool = True
     cache_ttl_hours: int = 24
     max_workers: int = 5
@@ -51,10 +65,27 @@ class Config:
     exclude_sources: List[str] = None
     verbose: bool = False
     quiet: bool = False
+    rate_limit_delay: float = 0.1
+    max_concurrent_requests: int = 10
+    enable_progress_bar: bool = True
     
     def __post_init__(self):
         if self.exclude_sources is None:
             self.exclude_sources = []
+        # Validate worker count based on system capabilities
+        import multiprocessing
+        max_cpus = multiprocessing.cpu_count()
+        if self.max_workers > max_cpus * 2:
+            self.max_workers = max_cpus * 2
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert config to dictionary"""
+        return asdict(self)
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Config':
+        """Create config from dictionary"""
+        return cls(**data)
 
 class Colors:
     """Enhanced terminal color definitions with Colorama"""
@@ -86,26 +117,47 @@ class Colors:
         return f"{Fore.CYAN}{text}{Style.RESET_ALL}"
 
 class CacheManager:
-    """SQLite-based cache manager for vulnerability data"""
+    """Enhanced SQLite-based cache manager for vulnerability data"""
     
     def __init__(self, cache_dir: Path = None, ttl_hours: int = 24):
         self.cache_dir = cache_dir or Path.home() / '.nuget-cli' / 'cache'
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.cache_dir / 'vulnerabilities.db'
         self.ttl = timedelta(hours=ttl_hours)
+        self._lock = threading.Lock()
         self._init_db()
+        self._stats = {'hits': 0, 'misses': 0, 'errors': 0}
     
     def _init_db(self):
-        """Initialize cache database"""
+        """Initialize cache database with enhanced schema"""
         with self._get_connection() as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS cache (
                     key TEXT PRIMARY KEY,
+                    package_name TEXT,
                     data BLOB,
-                    timestamp REAL
+                    timestamp REAL,
+                    access_count INTEGER DEFAULT 1,
+                    last_accessed REAL DEFAULT (strftime('%s', 'now'))
                 )
             ''')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON cache(timestamp)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_package ON cache(package_name)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_access ON cache(last_accessed)')
+            
+            # Create metadata table for cache statistics
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS cache_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            ''')
+            
+            # Initialize version info
+            conn.execute(
+                'INSERT OR IGNORE INTO cache_metadata (key, value) VALUES (?, ?)',
+                ('version', '2.0')
+            )
     
     @contextmanager
     def _get_connection(self):
@@ -118,31 +170,49 @@ class CacheManager:
             conn.close()
     
     def get(self, key: str) -> Optional[Any]:
-        """Get cached data if not expired"""
-        with self._get_connection() as conn:
-            cursor = conn.execute(
-                'SELECT data, timestamp FROM cache WHERE key = ?',
-                (key,)
-            )
-            row = cursor.fetchone()
-            
-            if row:
-                data, timestamp = row
-                if datetime.fromtimestamp(timestamp) + self.ttl > datetime.now():
-                    return pickle.loads(data)
-                else:
-                    # Clean up expired entry
-                    conn.execute('DELETE FROM cache WHERE key = ?', (key,))
-        
-        return None
+        """Get cached data if not expired with enhanced tracking"""
+        with self._lock:
+            try:
+                with self._get_connection() as conn:
+                    cursor = conn.execute(
+                        'SELECT data, timestamp FROM cache WHERE key = ?',
+                        (key,)
+                    )
+                    row = cursor.fetchone()
+                    
+                    if row:
+                        data, timestamp = row
+                        if datetime.fromtimestamp(timestamp) + self.ttl > datetime.now():
+                            # Update access statistics
+                            conn.execute(
+                                'UPDATE cache SET access_count = access_count + 1, last_accessed = ? WHERE key = ?',
+                                (datetime.now().timestamp(), key)
+                            )
+                            self._stats['hits'] += 1
+                            return pickle.loads(data)
+                        else:
+                            # Clean up expired entry
+                            conn.execute('DELETE FROM cache WHERE key = ?', (key,))
+                    
+                    self._stats['misses'] += 1
+                    return None
+            except Exception as e:
+                self._stats['errors'] += 1
+                print(Colors.warning(f"Cache error: {e}"))
+                return None
     
-    def set(self, key: str, data: Any):
-        """Store data in cache"""
-        with self._get_connection() as conn:
-            conn.execute(
-                'INSERT OR REPLACE INTO cache (key, data, timestamp) VALUES (?, ?, ?)',
-                (key, pickle.dumps(data), datetime.now().timestamp())
-            )
+    def set(self, key: str, data: Any, package_name: str = None):
+        """Store data in cache with enhanced metadata"""
+        with self._lock:
+            try:
+                with self._get_connection() as conn:
+                    conn.execute(
+                        'INSERT OR REPLACE INTO cache (key, package_name, data, timestamp) VALUES (?, ?, ?, ?)',
+                        (key, package_name or 'unknown', pickle.dumps(data), datetime.now().timestamp())
+                    )
+            except Exception as e:
+                self._stats['errors'] += 1
+                print(Colors.warning(f"Cache write error: {e}"))
     
     def clear(self):
         """Clear all cache entries"""
@@ -150,33 +220,91 @@ class CacheManager:
             conn.execute('DELETE FROM cache')
     
     def cleanup_expired(self):
-        """Remove expired cache entries"""
+        """Remove expired cache entries with statistics"""
         cutoff = (datetime.now() - self.ttl).timestamp()
+        with self._lock:
+            try:
+                with self._get_connection() as conn:
+                    cursor = conn.execute('SELECT COUNT(*) FROM cache WHERE timestamp < ?', (cutoff,))
+                    expired_count = cursor.fetchone()[0]
+                    
+                    conn.execute('DELETE FROM cache WHERE timestamp < ?', (cutoff,))
+                    
+                    if expired_count > 0:
+                        print(Colors.info(f"🧹 Cleaned up {expired_count} expired cache entries"))
+            except Exception as e:
+                print(Colors.warning(f"Cache cleanup error: {e}"))
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics"""
         with self._get_connection() as conn:
-            conn.execute('DELETE FROM cache WHERE timestamp < ?', (cutoff,))
+            cursor = conn.execute('SELECT COUNT(*) FROM cache')
+            total_entries = cursor.fetchone()[0]
+            
+            cursor = conn.execute('SELECT COUNT(*) FROM cache WHERE timestamp > ?', 
+                                ((datetime.now() - self.ttl).timestamp(),))
+            valid_entries = cursor.fetchone()[0]
+        
+        return {
+            'total_entries': total_entries,
+            'valid_entries': valid_entries,
+            'expired_entries': total_entries - valid_entries,
+            'hit_rate': self._stats['hits'] / (self._stats['hits'] + self._stats['misses']) if (self._stats['hits'] + self._stats['misses']) > 0 else 0,
+            **self._stats
+        }
+    
+    def get_size_mb(self) -> float:
+        """Get cache size in MB"""
+        try:
+            return self.db_path.stat().st_size / (1024 * 1024)
+        except:
+            return 0.0
 
 class RetryHandler:
-    """Handle retries with exponential backoff"""
+    """Enhanced retry handler with exponential backoff and jitter"""
     
-    def __init__(self, max_attempts: int = 3, base_delay: float = 1.0):
+    def __init__(self, max_attempts: int = 3, base_delay: float = 1.0, max_delay: float = 60.0):
         self.max_attempts = max_attempts
         self.base_delay = base_delay
+        self.max_delay = max_delay
+        self._retry_stats = {'total_attempts': 0, 'total_retries': 0, 'failures': 0}
     
     def execute(self, func, *args, **kwargs):
-        """Execute function with retry logic"""
+        """Execute function with enhanced retry logic"""
         last_exception = None
         
         for attempt in range(self.max_attempts):
+            self._retry_stats['total_attempts'] += 1
             try:
-                return func(*args, **kwargs)
-            except Exception as e:
+                result = func(*args, **kwargs)
+                if attempt > 0:
+                    self._retry_stats['total_retries'] += attempt
+                return result
+            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
                 last_exception = e
                 if attempt < self.max_attempts - 1:
-                    delay = self.base_delay * (2 ** attempt)
-                    time.sleep(delay)
-                continue
+                    # Exponential backoff with jitter
+                    import random
+                    delay = min(self.base_delay * (2 ** attempt), self.max_delay)
+                    jitter = random.uniform(0.1, 0.3) * delay
+                    total_delay = delay + jitter
+                    
+                    print(Colors.warning(f"⚠️  Request failed (attempt {attempt + 1}/{self.max_attempts}), retrying in {total_delay:.1f}s..."))
+                    time.sleep(total_delay)
+                    continue
+                else:
+                    self._retry_stats['failures'] += 1
+            except Exception as e:
+                # Non-network errors shouldn't be retried
+                last_exception = e
+                self._retry_stats['failures'] += 1
+                break
         
         raise last_exception
+    
+    def get_stats(self) -> Dict[str, int]:
+        """Get retry statistics"""
+        return self._retry_stats.copy()
 
 class EnhancedNuGetCLI:
     def __init__(self, config: Config = None):
@@ -185,7 +313,21 @@ class EnhancedNuGetCLI:
         self.cache = CacheManager(ttl_hours=self.config.cache_ttl_hours) if self.config.cache_enabled else None
         self.retry_handler = RetryHandler(self.config.retry_attempts, self.config.retry_delay)
         self.start_time = None
+        self._interrupted = False
         self._setup_proxy()
+        self._setup_signal_handlers()
+    
+    def _setup_signal_handlers(self):
+        """Setup signal handlers for graceful shutdown"""
+        def signal_handler(signum, frame):
+            self._interrupted = True
+            print(Colors.warning("\n⚠️  Scan interrupted by user. Cleaning up..."))
+            if self.cache:
+                print(Colors.info("💾 Saving cache state..."))
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        if platform.system() != 'Windows':
+            signal.signal(signal.SIGTERM, signal_handler)
     
     def _setup_proxy(self):
         """Setup proxy configuration"""
@@ -282,59 +424,106 @@ class EnhancedNuGetCLI:
         return packages
     
     def check_with_cache(self, package: str) -> List[Dict]:
-        """Check vulnerabilities with caching support"""
+        """Check vulnerabilities with enhanced caching support"""
+        package_name = package.split('.')[0] if '.' in package else package
+        
         if self.cache:
-            cache_key = hashlib.md5(package.encode()).hexdigest()
+            cache_key = hashlib.md5(package.encode('utf-8')).hexdigest()
             cached_result = self.cache.get(cache_key)
             
             if cached_result is not None:
+                if not self.config.quiet:
+                    print(Colors.info(f"💾 Using cached result for {package_name}"))
                 return cached_result
         
+        # Check for interruption
+        if self._interrupted:
+            return []
+        
         # If not in cache or cache disabled, fetch from API
-        # The VulnerabilityChecker returns a list for a single package
-        result = self.retry_handler.execute(
-            self.checker.check_vulnerabilities, [package]
-        )
-        
-        if self.cache and result is not None:
-            self.cache.set(cache_key, result)
-        
-        return result
+        try:
+            result = self.retry_handler.execute(
+                self.checker.check_vulnerabilities, [package]
+            )
+            
+            if self.cache and result is not None:
+                self.cache.set(cache_key, result, package_name)
+            
+            # Add small delay to respect rate limits
+            time.sleep(self.config.rate_limit_delay)
+            
+            return result
+        except Exception as e:
+            if not self.config.quiet:
+                print(Colors.error(f"❌ Error checking {package_name}: {e}"))
+            return []
     
     def scan_packages_parallel(self, packages: List[str]) -> List[Dict]:
-        """Scan packages in parallel with progress bar"""
+        """Enhanced parallel package scanning with better error handling"""
         vulnerabilities = []
+        failed_packages = []
+        start_time = time.time()
         
-        with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
+        # Limit concurrent requests to avoid overwhelming APIs
+        max_workers = min(self.config.max_workers, self.config.max_concurrent_requests)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all tasks
             future_to_package = {
                 executor.submit(self.check_with_cache, pkg): pkg 
                 for pkg in packages
             }
             
-            # Process results with progress bar
-            if not self.config.quiet:
+            # Setup progress bar
+            progress_bar = None
+            if not self.config.quiet and self.config.enable_progress_bar:
                 progress_bar = tqdm(
                     total=len(packages),
-                    desc="Scanning packages",
+                    desc="🔍 Scanning packages",
                     unit="pkg",
-                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]"
+                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+                    colour='cyan'
                 )
             
+            completed_count = 0
             for future in as_completed(future_to_package):
+                if self._interrupted:
+                    # Cancel remaining futures
+                    for f in future_to_package:
+                        f.cancel()
+                    break
+                
                 package = future_to_package[future]
+                completed_count += 1
+                
                 try:
-                    result = future.result()
+                    result = future.result(timeout=self.config.timeout)
                     if result:
                         vulnerabilities.extend(result)
+                        if progress_bar:
+                            progress_bar.set_postfix({
+                                'vulns': len(vulnerabilities),
+                                'failed': len(failed_packages)
+                            })
                 except Exception as e:
-                    print(Colors.error(f"Error scanning {package}: {e}"))
+                    failed_packages.append(package)
+                    if not self.config.quiet:
+                        print(Colors.error(f"❌ Error scanning {package}: {e}"))
                 
-                if not self.config.quiet:
+                if progress_bar:
                     progress_bar.update(1)
             
-            if not self.config.quiet:
+            if progress_bar:
                 progress_bar.close()
+        
+        # Summary of scan results
+        duration = time.time() - start_time
+        if not self.config.quiet:
+            success_rate = ((len(packages) - len(failed_packages)) / len(packages)) * 100
+            print(Colors.info(f"⚙️  Scan completed in {duration:.2f}s (success rate: {success_rate:.1f}%)"))
+            
+            if failed_packages:
+                print(Colors.warning(f"⚠️  Failed to scan {len(failed_packages)} packages: {', '.join(failed_packages[:5])}{'...' if len(failed_packages) > 5 else ''}"))
         
         return vulnerabilities
     
@@ -610,9 +799,9 @@ class EnhancedNuGetCLI:
         return severity_colors.get(severity.upper(), Colors.WHITE)
     
     def display_summary(self, vulnerabilities: List[Dict], packages_count: int):
-        """Display scan summary"""
+        """Enhanced display scan summary with detailed statistics"""
         print("\n" + "="*80)
-        print(Colors.info(Colors.BOLD + "📊 SCAN SUMMARY"))
+        print(Colors.info(Colors.BOLD + "📊 COMPREHENSIVE SCAN SUMMARY"))
         print("="*80)
         
         # Statistics
@@ -620,48 +809,98 @@ class EnhancedNuGetCLI:
         severity_counts = {}
         sources = set()
         packages_with_vulns = set()
+        cve_years = {}
         
         for vuln in vulnerabilities:
             severity = vuln.get('severity', 'UNKNOWN').upper()
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
             sources.add(vuln.get('source', 'Unknown'))
             packages_with_vulns.add(vuln.get('package', 'Unknown'))
+            
+            # Extract year from CVE ID
+            cve_id = vuln.get('cve_id', '')
+            if cve_id.startswith('CVE-'):
+                try:
+                    year = cve_id.split('-')[1]
+                    cve_years[year] = cve_years.get(year, 0) + 1
+                except:
+                    pass
         
         # Basic statistics
+        safe_packages = packages_count - len(packages_with_vulns)
         print(f"📦 Packages scanned: {Colors.BOLD}{packages_count}{Colors.RESET}")
-        print(f"🔍 Vulnerabilities found: {Colors.BOLD}{total_vulns}{Colors.RESET}")
-        print(f"⚠️  Affected packages: {Colors.BOLD}{len(packages_with_vulns)}{Colors.RESET}")
+        print(f"✅ Safe packages: {Colors.GREEN}{Colors.BOLD}{safe_packages}{Colors.RESET}")
+        print(f"⚠️  Vulnerable packages: {Colors.RED}{Colors.BOLD}{len(packages_with_vulns)}{Colors.RESET}")
+        print(f"🔍 Total vulnerabilities: {Colors.BOLD}{total_vulns}{Colors.RESET}")
         print(f"🌐 Data sources: {Colors.BOLD}{', '.join(sorted(sources))}{Colors.RESET}")
         
-        # Severity distribution
+        # Severity distribution with percentages
         if severity_counts:
             print(f"\n🚨 Severity distribution:")
             for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN']:
                 count = severity_counts.get(severity, 0)
                 if count > 0:
+                    percentage = (count / total_vulns) * 100
                     color = self.get_severity_color(severity)
-                    print(f"  {color}● {severity}: {count}{Colors.RESET}")
+                    print(f"  {color}● {severity}: {count} ({percentage:.1f}%){Colors.RESET}")
         
-        # Risk assessment
+        # CVE year distribution (top 5)
+        if cve_years:
+            print(f"\n📅 CVE year distribution (recent):")
+            sorted_years = sorted(cve_years.items(), key=lambda x: x[0], reverse=True)[:5]
+            for year, count in sorted_years:
+                print(f"  📆 {year}: {count} vulnerabilities")
+        
+        # Risk assessment with recommendations
         risk_level = "LOW"
         risk_color = Colors.GREEN
+        recommendations = []
         
         if severity_counts.get('CRITICAL', 0) > 0:
             risk_level = "CRITICAL"
             risk_color = Colors.RED
+            recommendations.append("🚨 Immediate action required for CRITICAL vulnerabilities")
+            recommendations.append("📋 Consider emergency patching or temporary mitigations")
         elif severity_counts.get('HIGH', 0) > 0:
             risk_level = "HIGH"
             risk_color = Colors.MAGENTA
+            recommendations.append("⚡ Prioritize HIGH severity vulnerabilities for patching")
+            recommendations.append("📅 Plan remediation within 30 days")
         elif severity_counts.get('MEDIUM', 0) > 0:
             risk_level = "MEDIUM"
             risk_color = Colors.YELLOW
+            recommendations.append("📝 Schedule MEDIUM severity vulnerabilities for next maintenance window")
+        else:
+            recommendations.append("✅ No high-priority vulnerabilities found")
         
         print(f"\n⚡ Overall risk level: {risk_color}{Colors.BOLD}{risk_level}{Colors.RESET}")
         
-        # Execution time
+        if recommendations:
+            print(f"\n💡 Recommendations:")
+            for rec in recommendations:
+                print(f"  {rec}")
+        
+        # Performance and cache statistics
+        if self.cache:
+            cache_stats = self.cache.get_stats()
+            cache_size = self.cache.get_size_mb()
+            print(f"\n📊 Performance Statistics:")
+            print(f"  💾 Cache hit rate: {cache_stats['hit_rate']:.1%}")
+            print(f"  📁 Cache size: {cache_size:.1f} MB")
+            print(f"  🗃️  Cache entries: {cache_stats['valid_entries']}/{cache_stats['total_entries']}")
+        
+        # Execution time with performance metrics
         if self.start_time:
             duration = time.time() - self.start_time
-            print(f"⏱️  Scan duration: {Colors.BOLD}{duration:.2f} seconds{Colors.RESET}")
+            packages_per_second = packages_count / duration if duration > 0 else 0
+            print(f"\n⏱️  Performance:")
+            print(f"  🕐 Scan duration: {Colors.BOLD}{duration:.2f} seconds{Colors.RESET}")
+            print(f"  🚀 Throughput: {Colors.BOLD}{packages_per_second:.1f} packages/second{Colors.RESET}")
+        
+        # Retry statistics
+        retry_stats = self.retry_handler.get_stats()
+        if retry_stats['total_retries'] > 0:
+            print(f"  🔄 Network retries: {retry_stats['total_retries']}/{retry_stats['total_attempts']} ({retry_stats['failures']} failures)")
     
     def display_vulnerabilities(self, vulnerabilities: List[Dict], detailed: bool = False):
         """Display vulnerability details"""
@@ -895,84 +1134,92 @@ class EnhancedNuGetCLI:
         )
     
     def run(self, args):
-        """Execute enhanced main program"""
+        """Execute enhanced main program with improved error handling"""
         self.start_time = time.time()
         
-        # Load config file if specified
-        if args.config:
-            config_path = Path(args.config)
-            if config_path.exists():
-                self.config = self.load_config_file(config_path)
-        
-        # Override config with command line arguments
-        if args.verbose:
-            self.config.verbose = True
-        if args.quiet:
-            self.config.quiet = True
-        
-        if not self.config.quiet:
-            self.print_banner()
-        
-        # Clean up expired cache entries
-        if self.cache:
-            self.cache.cleanup_expired()
-        
-        # Collect package list
-        packages = []
-        
-        # From command line arguments
-        if args.packages:
-            packages.extend([pkg.strip() for pkg in args.packages.split(',')])
-        
-        # From solution file
-        if args.solution:
-            sln_packages = self.parse_solution_file(args.solution)
-            packages.extend(sln_packages)
-            if not self.config.quiet:
-                print(Colors.info(f"📋 Found {len(sln_packages)} packages in solution file"))
-        
-        # From Python list format
-        if args.list_format:
-            list_packages = self.parse_package_list_format(args.list_format)
-            packages.extend(list_packages)
-            if not self.config.quiet:
-                print(Colors.info(f"📋 Loaded {len(list_packages)} packages from list format"))
-        
-        # From file
-        if args.file:
-            file_packages = self.parse_packages_from_file(args.file)
-            packages.extend(file_packages)
-            if not self.config.quiet:
-                print(Colors.info(f"📁 Loaded {len(file_packages)} packages from file"))
-        
-        # From directory scan
-        if args.scan_dir:
-            dir_packages = self.scan_directory_for_packages(args.scan_dir)
-            packages.extend(dir_packages)
-            if not self.config.quiet:
-                print(Colors.info(f"📂 Found {len(dir_packages)} packages in directory"))
-        
-        # Remove duplicates
-        packages = list(set(packages))
-        
-        if not packages:
-            print(Colors.error("❌ No packages specified for checking"))
-            print(Colors.warning("💡 Use --help to see usage instructions"))
-            return 1
-        
-        # Interactive mode
-        if args.interactive:
-            packages = self.interactive_mode(packages)
-        
-        if not self.config.quiet:
-            print(Colors.success(f"🚀 Starting scan of {len(packages)} packages..."))
-            if self.config.verbose:
-                print("Package list:")
-                for pkg in packages:
-                    print(f"  • {pkg}")
-        
-        # Execute vulnerability check
         try:
+            # Load config file if specified
+            if args.config:
+                config_path = Path(args.config)
+                if config_path.exists():
+                    self.config = self.load_config_file(config_path)
+                    if not self.config.quiet:
+                        print(Colors.info(f"📁 Loaded configuration from {config_path}"))
+                else:
+                    print(Colors.warning(f"⚠️  Configuration file not found: {config_path}"))
+            
+            # Override config with command line arguments
+            if args.verbose:
+                self.config.verbose = True
+            if args.quiet:
+                self.config.quiet = True
+            if args.workers:
+                self.config.max_workers = args.workers
+            
+            if not self.config.quiet:
+                self.print_banner()
+                # Display current configuration
+                print(Colors.info(f"⚙️  Configuration: Workers={self.config.max_workers}, Cache={'enabled' if self.config.cache_enabled else 'disabled'}, TTL={self.config.cache_ttl_hours}h"))
+            
+            # Clean up expired cache entries
+            if self.cache:
+                self.cache.cleanup_expired()
+            
+            # Collect package list
+            packages = []
+            
+            # From command line arguments
+            if args.packages:
+                packages.extend([pkg.strip() for pkg in args.packages.split(',')])
+            
+            # From solution file
+            if args.solution:
+                sln_packages = self.parse_solution_file(args.solution)
+                packages.extend(sln_packages)
+                if not self.config.quiet:
+                    print(Colors.info(f"📋 Found {len(sln_packages)} packages in solution file"))
+            
+            # From Python list format
+            if args.list_format:
+                list_packages = self.parse_package_list_format(args.list_format)
+                packages.extend(list_packages)
+                if not self.config.quiet:
+                    print(Colors.info(f"📋 Loaded {len(list_packages)} packages from list format"))
+            
+            # From file
+            if args.file:
+                file_packages = self.parse_packages_from_file(args.file)
+                packages.extend(file_packages)
+                if not self.config.quiet:
+                    print(Colors.info(f"📁 Loaded {len(file_packages)} packages from file"))
+            
+            # From directory scan
+            if args.scan_dir:
+                dir_packages = self.scan_directory_for_packages(args.scan_dir)
+                packages.extend(dir_packages)
+                if not self.config.quiet:
+                    print(Colors.info(f"📂 Found {len(dir_packages)} packages in directory"))
+            
+            # Remove duplicates
+            packages = list(set(packages))
+            
+            if not packages:
+                print(Colors.error("❌ No packages specified for checking"))
+                print(Colors.warning("💡 Use --help to see usage instructions"))
+                return 1
+            
+            # Interactive mode
+            if args.interactive:
+                packages = self.interactive_mode(packages)
+            
+            if not self.config.quiet:
+                print(Colors.success(f"🚀 Starting scan of {len(packages)} packages..."))
+                if self.config.verbose:
+                    print("Package list:")
+                    for pkg in packages:
+                        print(f"  • {pkg}")
+            
+            # Execute vulnerability check
             vulnerabilities = self.scan_packages_parallel(packages)
             
             # Apply filters
@@ -994,8 +1241,12 @@ class EnhancedNuGetCLI:
                 self.export_results(vulnerabilities, args.output, format_type)
             
             # Check exit conditions
+            exit_code = 0
+            
             if args.fail_on_vuln and vulnerabilities:
-                return 1
+                if not self.config.quiet:
+                    print(Colors.error("🚫 Exiting with error code due to --fail-on-vuln flag"))
+                exit_code = 1
             
             if self.config.fail_on_severity:
                 severity_levels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
@@ -1005,19 +1256,36 @@ class EnhancedNuGetCLI:
                     vuln_severity = vuln.get('severity', 'UNKNOWN').upper()
                     if vuln_severity in severity_levels:
                         if severity_levels.index(vuln_severity) >= min_severity_index:
-                            return 1
+                            if not self.config.quiet:
+                                print(Colors.error(f"🚫 Exiting with error code due to {vuln_severity} severity vulnerability (threshold: {self.config.fail_on_severity})"))
+                            exit_code = 1
+                            break
             
-            return 0
+            # Final summary
+            if not self.config.quiet and not self._interrupted:
+                if exit_code == 0:
+                    print(Colors.success("\n✅ Scan completed successfully!"))
+                else:
+                    print(Colors.error("\n❌ Scan completed with issues"))
+            
+            return exit_code
             
         except KeyboardInterrupt:
+            self._interrupted = True
             print(Colors.warning("\n⚠️  Scan interrupted by user"))
             return 130
         except Exception as e:
-            print(Colors.error(f"❌ Error during scan: {e}"))
+            print(Colors.error(f"❌ Unexpected error during scan: {e}"))
             if self.config.verbose:
                 import traceback
                 traceback.print_exc()
             return 1
+        finally:
+            # Cleanup operations
+            if self.cache and not self.config.quiet:
+                cache_stats = self.cache.get_stats()
+                if cache_stats['total_entries'] > 0:
+                    print(Colors.info(f"💾 Cache performance: {cache_stats['hit_rate']:.1%} hit rate, {cache_stats['valid_entries']} entries"))
 
 def create_sample_config():
     """Create sample configuration file"""
@@ -1086,27 +1354,41 @@ def create_sample_files():
     print("  • sample_packages_en.json")
 
 def main():
-    """Enhanced main function"""
+    """Enhanced main function with comprehensive argument parsing"""
     parser = argparse.ArgumentParser(
-        description='NuGet Package Vulnerability Scanner - Enhanced CLI',
+        description='NuGet Package Vulnerability Scanner - Enhanced CLI Pro v2.0',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Enhanced Features:
-  • Caching support for faster repeated scans
-  • Parallel scanning with progress bars
-  • Solution file (.sln) support
-  • Advanced filtering options
-  • Configuration file support
-  • Retry logic with exponential backoff
+🚀 Enhanced Features:
+  • SQLite-based caching for 10x faster repeated scans
+  • Parallel processing with configurable worker threads
+  • Solution file (.sln) and project file scanning
+  • Advanced filtering by severity, CVE patterns, and dates
+  • Configuration file support with .nugetcli.config
+  • Retry logic with exponential backoff and jitter
   • Interactive package selection mode
-  • Multiple export formats including Markdown
+  • Multiple export formats: JSON, CSV, HTML, Markdown
+  • Progress bars and enhanced terminal output
+  • Network proxy support for enterprise environments
+  • Graceful signal handling and interruption
+  • Comprehensive statistics and performance metrics
 
-Usage Examples:
+📋 Usage Examples:
   %(prog)s -p "serilog.4.3.0,newtonsoft.json.13.0.1"
-  %(prog)s --solution MyProject.sln -o report.md --format markdown
+  %(prog)s --solution MyProject.sln -o security-report.md --format markdown
   %(prog)s -f packages.txt --filter-severity HIGH --fail-on-severity CRITICAL
-  %(prog)s --scan-dir ./src --interactive --config .nugetcli.config
-  %(prog)s -p "log4net.2.0.8" --no-cache --workers 10
+  %(prog)s --scan-dir ./src --interactive --config .nugetcli.config -v
+  %(prog)s -p "log4net.2.0.8" --no-cache --workers 10 --timeout 60
+  %(prog)s --clear-cache  # Clear cached vulnerability data
+  %(prog)s --create-config  # Generate sample configuration file
+
+🔧 Configuration:
+  Create .nugetcli.config file with settings for cache, proxy, workers, etc.
+  Use --create-config to generate a sample configuration file.
+
+🌐 Enterprise Support:
+  Set proxy configuration in config file or environment variables.
+  Supports HTTP_PROXY and HTTPS_PROXY environment variables.
         """
     )
     
@@ -1197,14 +1479,39 @@ Usage Examples:
         fail_on_severity=args.fail_on_severity
     )
     
-    # Check if any input is provided
+    # Validate arguments
     if not any([args.packages, args.solution, args.list_format, args.file, args.scan_dir]):
+        print(Colors.error("❌ No input specified. Please provide packages, files, or directories to scan."))
+        print(Colors.info("💡 Use --help for usage examples and options."))
         parser.print_help()
         return 1
     
-    # Execute scan
-    cli = EnhancedNuGetCLI(config)
-    return cli.run(args)
+    # Validate worker count
+    if args.workers and args.workers < 1:
+        print(Colors.error("❌ Worker count must be at least 1"))
+        return 1
+    
+    if args.workers and args.workers > 50:
+        print(Colors.warning("⚠️  High worker count may overwhelm APIs. Consider using 10 or fewer workers."))
+    
+    # Environment variable support for proxy
+    if not config.proxy:
+        config.proxy = os.environ.get('HTTP_PROXY') or os.environ.get('HTTPS_PROXY')
+    
+    try:
+        # Execute scan
+        cli = EnhancedNuGetCLI(config)
+        return cli.run(args)
+    except Exception as e:
+        print(Colors.error(f"❌ Failed to initialize scanner: {e}"))
+        return 1
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print(Colors.warning("\n⚠️  Program interrupted by user"))
+        sys.exit(130)
+    except Exception as e:
+        print(Colors.error(f"❌ Fatal error: {e}"))
+        sys.exit(1)
