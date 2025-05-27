@@ -753,13 +753,16 @@ class EnhancedNuGetCLI:
                     vuln_packages.add(base_name)
         
         for pkg in packages:
-            pkg_base = pkg
-            if '.' in pkg:
-                parts = pkg.split('.')
-                if parts[-1].replace('.', '').isdigit():
-                    pkg_base = '.'.join(parts[:-1])
+            # Check if this package has any vulnerabilities
+            has_vulns = False
+            for v in all_vulnerabilities:
+                vuln_pkg = v.get('package', '').lower()
+                pkg_name = pkg.split('.')[0].lower() if '.' in pkg else pkg.lower()
+                if vuln_pkg == pkg_name:
+                    has_vulns = True
+                    break
             
-            if pkg in vuln_packages or pkg_base in vuln_packages:
+            if has_vulns:
                 stats['vulnerable_packages'].add(pkg)
             elif pkg not in failed_packages:
                 stats['safe_packages'].add(pkg)
@@ -767,7 +770,16 @@ class EnhancedNuGetCLI:
         # Categorize dependencies
         for pkg in scanned_packages:
             if pkg not in packages and pkg not in failed_packages:
-                if pkg in vuln_packages:
+                # Check if this dependency has any vulnerabilities
+                has_vulns = False
+                for v in all_vulnerabilities:
+                    vuln_pkg = v.get('package', '').lower()
+                    pkg_name = pkg.split('.')[0].lower() if '.' in pkg else pkg.lower()
+                    if vuln_pkg == pkg_name:
+                        has_vulns = True
+                        break
+                
+                if has_vulns:
                     stats['vulnerable_dependencies'].add(pkg)
                 else:
                     stats['safe_dependencies'].add(pkg)
@@ -899,16 +911,28 @@ class EnhancedNuGetCLI:
         return datetime.now()
     
     def generate_markdown_report(self, vulnerabilities: List[Dict]) -> str:
-        """Generate Markdown format report"""
+        """Generate Markdown format report with package grouping"""
+        # Group vulnerabilities by package
+        package_groups = {}
+        for vuln in vulnerabilities:
+            pkg_key = f"{vuln.get('package', 'Unknown')} v{vuln.get('package_version', 'N/A')}"
+            if pkg_key not in package_groups:
+                package_groups[pkg_key] = []
+            package_groups[pkg_key].append(vuln)
+        
+        # Generate report
         md_content = f"""# NuGet Vulnerability Scan Report
 
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
-**Total Vulnerabilities:** {len(vulnerabilities)}
+**Total Vulnerabilities:** {len(vulnerabilities)}  
+**Affected Packages:** {len(package_groups)}
 
 ## Summary
 
+### Severity Distribution
+
 """
-        # Group by severity
+        # Group by severity for summary
         severity_groups = {}
         for vuln in vulnerabilities:
             severity = vuln.get('severity', 'UNKNOWN')
@@ -917,27 +941,54 @@ class EnhancedNuGetCLI:
             severity_groups[severity].append(vuln)
         
         # Summary table
-        md_content += "| Severity | Count |\n|----------|-------|\n"
+        md_content += "| Severity | Count | Percentage |\n|----------|-------|------------|\n"
         for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN']:
             count = len(severity_groups.get(severity, []))
             if count > 0:
-                md_content += f"| {severity} | {count} |\n"
+                percentage = (count / len(vulnerabilities)) * 100
+                md_content += f"| {severity} | {count} | {percentage:.1f}% |\n"
+        
+        # Affected packages summary
+        md_content += "\n### Affected Packages\n\n"
+        md_content += "| Package | Version | Vulnerabilities |\n|---------|---------|----------------|\n"
+        for pkg_key, vulns in sorted(package_groups.items()):
+            pkg_name = vulns[0].get('package', 'Unknown')
+            pkg_version = vulns[0].get('package_version', 'N/A')
+            md_content += f"| {pkg_name} | {pkg_version} | {len(vulns)} |\n"
         
         md_content += "\n## Detailed Findings\n\n"
         
-        # Detailed vulnerabilities
-        for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN']:
-            vulns = severity_groups.get(severity, [])
-            if vulns:
-                md_content += f"### {severity} Severity\n\n"
-                for vuln in vulns:
-                    md_content += f"#### {vuln.get('cve_id', 'N/A')}\n\n"
-                    md_content += f"- **Package:** {vuln.get('package', 'Unknown')}\n"
-                    md_content += f"- **Version:** {vuln.get('package_version', 'N/A')}\n"
-                    md_content += f"- **CVSS Score:** {vuln.get('cvss_score', 'N/A')}\n"
-                    md_content += f"- **Source:** {vuln.get('source', 'Unknown')}\n"
-                    md_content += f"- **Description:** {vuln.get('description', 'N/A')}\n"
-                    md_content += f"- **Reference:** [{vuln.get('link', 'N/A')}]({vuln.get('link', '#')})\n\n"
+        # Detailed vulnerabilities grouped by package
+        for pkg_idx, (pkg_key, vulns) in enumerate(sorted(package_groups.items()), 1):
+            md_content += f"### [{pkg_idx}] {pkg_key}\n\n"
+            
+            # Package severity summary
+            pkg_sev_counts = {}
+            for v in vulns:
+                sev = v.get('severity', 'UNKNOWN')
+                pkg_sev_counts[sev] = pkg_sev_counts.get(sev, 0) + 1
+            
+            sev_summary = " | ".join([f"**{sev}**: {count}" for sev, count in sorted(pkg_sev_counts.items())])
+            md_content += f"**Severity Breakdown:** {sev_summary}\n\n"
+            
+            # List vulnerabilities
+            for vuln in vulns:
+                md_content += f"#### {vuln.get('cve_id', 'N/A')}\n\n"
+                md_content += f"- **Severity:** {vuln.get('severity', 'UNKNOWN')}\n"
+                md_content += f"- **CVSS Score:** {vuln.get('cvss_score', 'N/A')}\n"
+                md_content += f"- **Source:** {vuln.get('source', 'Unknown')}\n"
+                
+                desc = vuln.get('description', 'N/A')
+                if len(desc) > 200:
+                    desc = desc[:200] + "..."
+                md_content += f"- **Description:** {desc}\n"
+                
+                if vuln.get('is_conservative_match'):
+                    md_content += "- **Note:** ⚠️ Conservative match - package name matches but no specific version range found\n"
+                    
+                md_content += f"- **Reference:** [{vuln.get('link', 'N/A')}]({vuln.get('link', '#')})\n\n"
+            
+            md_content += "---\n\n"
         
         return md_content
     
@@ -1163,6 +1214,23 @@ class EnhancedNuGetCLI:
         print(f"│ {Colors.BOLD}TOTAL{Colors.RESET}                       │ {Colors.BOLD}{total_scanned:>8}{Colors.RESET} │ {Colors.RED}{Colors.BOLD}{total_vulnerable:>11}{Colors.RESET}  │ {Colors.GREEN}{Colors.BOLD}{total_safe:>11}{Colors.RESET} │")
         print("└─────────────────────────────┴──────────┴──────────────┴─────────────┘")
         
+        # Display vulnerable packages list if any
+        if scan_stats['vulnerable_packages'] or scan_stats['vulnerable_dependencies']:
+            print(f"\n{Colors.BOLD}⚠️  VULNERABLE PACKAGES{Colors.RESET}")
+            if scan_stats['vulnerable_packages']:
+                print(f"\n{Colors.RED}Main Packages:{Colors.RESET}")
+                for pkg in sorted(scan_stats['vulnerable_packages']):
+                    # Count vulnerabilities for this package
+                    pkg_vuln_count = sum(1 for v in vulnerabilities if v.get('package', '').lower() == pkg.split('.')[0].lower())
+                    print(f"  • {pkg} ({pkg_vuln_count} vulnerabilities)")
+            
+            if scan_stats['vulnerable_dependencies']:
+                print(f"\n{Colors.RED}Dependencies:{Colors.RESET}")
+                for pkg in sorted(scan_stats['vulnerable_dependencies']):
+                    # Count vulnerabilities for this package
+                    pkg_vuln_count = sum(1 for v in vulnerabilities if v.get('package', '').lower() == pkg.split('.')[0].lower())
+                    print(f"  • {pkg} ({pkg_vuln_count} vulnerabilities)")
+        
         # Display vulnerability statistics
         if total_vulns > 0:
             print(f"\n{Colors.BOLD}🚨 VULNERABILITY BREAKDOWN{Colors.RESET}")
@@ -1254,7 +1322,7 @@ class EnhancedNuGetCLI:
             print(f"  🔄 Network retries: {retry_stats['total_retries']}/{retry_stats['total_attempts']} ({retry_stats['failures']} failures)")
     
     def display_vulnerabilities(self, vulnerabilities: List[Dict], detailed: bool = False):
-        """Display vulnerability details"""
+        """Display vulnerability details grouped by package"""
         if not vulnerabilities:
             print(Colors.success(Colors.BOLD + "✅ No known vulnerabilities found!"))
             return
@@ -1263,33 +1331,61 @@ class EnhancedNuGetCLI:
         print(Colors.error(Colors.BOLD + "🔍 VULNERABILITIES FOUND"))
         print("="*80)
         
-        for i, vuln in enumerate(vulnerabilities, 1):
-            severity_color = self.get_severity_color(vuln.get('severity', 'UNKNOWN'))
-            is_conservative = vuln.get('is_conservative_match', False)
-            
-            print(f"\n{Colors.BOLD}[{i}] {vuln.get('package', 'Unknown')}{Colors.RESET}")
-            print(f"    🆔 CVE ID: {Colors.CYAN}{vuln.get('cve_id', 'N/A')}{Colors.RESET}")
-            print(f"    📊 CVSS Score: {Colors.BOLD}{vuln.get('cvss_score', 'N/A')}{Colors.RESET}")
-            print(f"    🚨 Severity: {severity_color}{Colors.BOLD}{vuln.get('severity', 'UNKNOWN')}{Colors.RESET}")
-            print(f"    📦 Package Version: {Colors.YELLOW}{vuln.get('package_version', 'N/A')}{Colors.RESET}")
-            print(f"    🌐 Data Source: {Colors.BLUE}{Colors.BOLD}{vuln.get('source', 'Unknown')}{Colors.RESET}")
-            
-            # Highlight conservative judgment cases
-            if is_conservative:
-                print(f"    {Colors.YELLOW}{Colors.BOLD}⚠️  Note: Package name matches but no specific version range found, using conservative judgment{Colors.RESET}")
-            
-            if detailed:
-                description = vuln.get('description', 'N/A')
-                if len(description) > 100:
-                    description = description[:100] + "..."
-                print(f"    📝 Description: {description}")
-                # Highlight links
-                print(f"    🔗 Link: {Colors.CYAN}{Colors.BOLD}{vuln.get('link', 'N/A')}{Colors.RESET}")
-            else:
-                # Show highlighted links even in non-detailed mode
-                print(f"    🔗 Link: {Colors.CYAN}{Colors.BOLD}{vuln.get('link', 'N/A')}{Colors.RESET}")
-            
+        # Group vulnerabilities by package
+        package_vulns = {}
+        for vuln in vulnerabilities:
+            pkg_key = f"{vuln.get('package', 'Unknown')} v{vuln.get('package_version', 'N/A')}"
+            if pkg_key not in package_vulns:
+                package_vulns[pkg_key] = []
+            package_vulns[pkg_key].append(vuln)
+        
+        # Display vulnerabilities grouped by package
+        vuln_count = 0
+        for pkg_idx, (package_key, vulns) in enumerate(sorted(package_vulns.items()), 1):
+            # Package header
+            print(f"\n{Colors.BOLD}{Colors.CYAN}📦 [{pkg_idx}] {package_key}{Colors.RESET}")
+            print(f"{Colors.BOLD}    Found {len(vulns)} vulnerabilities in this package{Colors.RESET}")
             print(f"    {'-'*60}")
+            
+            # Severity summary for this package
+            pkg_severity_counts = {}
+            for v in vulns:
+                sev = v.get('severity', 'UNKNOWN').upper()
+                pkg_severity_counts[sev] = pkg_severity_counts.get(sev, 0) + 1
+            
+            severity_summary = []
+            for sev in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']:
+                if pkg_severity_counts.get(sev, 0) > 0:
+                    color = self.get_severity_color(sev)
+                    severity_summary.append(f"{color}{sev}: {pkg_severity_counts[sev]}{Colors.RESET}")
+            
+            if severity_summary:
+                print(f"    📊 Severity breakdown: {' | '.join(severity_summary)}")
+                print(f"    {'-'*60}")
+            
+            # Display each vulnerability
+            for vuln in vulns:
+                vuln_count += 1
+                severity_color = self.get_severity_color(vuln.get('severity', 'UNKNOWN'))
+                is_conservative = vuln.get('is_conservative_match', False)
+                
+                print(f"\n    {Colors.BOLD}[{vuln_count}] {vuln.get('cve_id', 'N/A')}{Colors.RESET}")
+                print(f"        📊 CVSS Score: {Colors.BOLD}{vuln.get('cvss_score', 'N/A')}{Colors.RESET}")
+                print(f"        🚨 Severity: {severity_color}{Colors.BOLD}{vuln.get('severity', 'UNKNOWN')}{Colors.RESET}")
+                print(f"        🌐 Data Source: {Colors.BLUE}{Colors.BOLD}{vuln.get('source', 'Unknown')}{Colors.RESET}")
+                
+                # Highlight conservative judgment cases
+                if is_conservative:
+                    print(f"        {Colors.YELLOW}{Colors.BOLD}⚠️  Note: Package name matches but no specific version range found, using conservative judgment{Colors.RESET}")
+                
+                if detailed:
+                    description = vuln.get('description', 'N/A')
+                    if len(description) > 100:
+                        description = description[:100] + "..."
+                    print(f"        📝 Description: {description}")
+                
+                # Always show links
+                print(f"        🔗 Link: {Colors.CYAN}{Colors.BOLD}{vuln.get('link', 'N/A')}{Colors.RESET}")
     
     def export_results(self, vulnerabilities: List[Dict], output_file: str, format_type: str):
         """Export results to file"""
