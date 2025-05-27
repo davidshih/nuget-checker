@@ -67,10 +67,15 @@ for pkg in sorted(imported_packages):
 
 # Display vulnerability checking URLs
 print("\n🌐 Vulnerability sources to be checked:")
-print("  • NVD (National Vulnerability Database): https://services.nvd.nist.gov/rest/json/cves/2.0")
-print("  • OSV (Open Source Vulnerabilities): https://api.osv.dev/v1/query")
-print("  • GitHub Advisory Database: https://api.github.com/graphql")
-print("  • Snyk Vulnerability Database: https://security.snyk.io/package/nuget/")
+print("  • NVD (National Vulnerability Database)")
+print("    └─ API: https://services.nvd.nist.gov/rest/json/cves/2.0")
+print("  • OSV (Open Source Vulnerabilities)")
+print("    └─ API: https://api.osv.dev/v1/query")
+print("  • GitHub Advisory Database")
+print("    └─ GraphQL API: https://api.github.com/graphql")
+print("    └─ Search API: https://api.github.com/search/repositories")
+print("  • Snyk Vulnerability Database")
+print("    └─ Web scraping: https://security.snyk.io/package/nuget/{package_name}")
 print()
 
 from vulnerability_checker_en import VulnerabilityChecker
