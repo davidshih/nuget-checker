@@ -445,6 +445,106 @@ class EnhancedNuGetCLI:
             }
             self.checker.session.proxies.update(proxies)
     
+    def fetch_package_dependencies(self, package_name: str, version: str) -> List[Dict[str, str]]:
+        """Fetch dependencies for a NuGet package from NuGet.org API"""
+        try:
+            # NuGet V3 API endpoint for package metadata
+            api_url = f"https://api.nuget.org/v3-flatcontainer/{package_name.lower()}/{version}/{package_name.lower()}.nuspec"
+            
+            response = self.checker.session.get(api_url, timeout=10)
+            if response.status_code == 404:
+                # Try alternative API endpoint
+                catalog_url = f"https://api.nuget.org/v3/registration5-semver1/{package_name.lower()}/{version}.json"
+                response = self.checker.session.get(catalog_url, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    dependencies = []
+                    
+                    # Extract dependencies from catalog data
+                    if 'catalogEntry' in data and 'dependencyGroups' in data['catalogEntry']:
+                        for group in data['catalogEntry']['dependencyGroups']:
+                            if 'dependencies' in group:
+                                for dep in group['dependencies']:
+                                    dep_name = dep.get('id', '')
+                                    dep_range = dep.get('range', '')
+                                    # Parse version range and get a specific version
+                                    dep_version = self._parse_version_range(dep_range)
+                                    if dep_name and dep_version:
+                                        dependencies.append({
+                                            'name': dep_name,
+                                            'version': dep_version
+                                        })
+                    return dependencies
+                    
+            elif response.status_code == 200:
+                # Parse nuspec XML
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(response.content)
+                
+                # Handle XML namespaces
+                ns = {'ns': 'http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd'}
+                if not root.find('.//ns:dependencies', ns):
+                    ns = {'ns': 'http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd'}
+                if not root.find('.//ns:dependencies', ns):
+                    ns = {'ns': 'http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd'}
+                
+                dependencies = []
+                for dep in root.findall('.//ns:dependency', ns):
+                    dep_id = dep.get('id')
+                    dep_version = dep.get('version', '')
+                    
+                    if dep_id:
+                        # Parse version range
+                        parsed_version = self._parse_version_range(dep_version)
+                        if parsed_version:
+                            dependencies.append({
+                                'name': dep_id,
+                                'version': parsed_version
+                            })
+                
+                return dependencies
+                
+        except Exception as e:
+            if not self.config.quiet:
+                print(Colors.warning(f"⚠️  Could not fetch dependencies for {package_name}: {e}"))
+        
+        return []
+    
+    def _parse_version_range(self, version_range: str) -> Optional[str]:
+        """Parse NuGet version range and return a specific version"""
+        if not version_range:
+            return None
+            
+        # Remove whitespace
+        version_range = version_range.strip()
+        
+        # Handle exact version
+        if not any(c in version_range for c in ['[', '(', ',', ')']):
+            return version_range
+            
+        # Handle version ranges like [1.0.0, 2.0.0)
+        if version_range.startswith('[') and ',' in version_range:
+            # Extract minimum version
+            min_version = version_range.split(',')[0].strip('[').strip()
+            return min_version
+            
+        # Handle minimum version like (>= 1.0.0)
+        if version_range.startswith('(') or version_range.startswith('['):
+            version = version_range.strip('()[]').strip()
+            if version.startswith('>='):
+                return version[2:].strip()
+            elif version.startswith('>'):
+                return version[1:].strip()
+                
+        # Default: try to extract any version number
+        import re
+        match = re.search(r'(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)', version_range)
+        if match:
+            return match.group(1)
+            
+        return None
+    
     def print_banner(self):
         """Display enhanced program banner"""
         banner = f"""
@@ -565,13 +665,129 @@ class EnhancedNuGetCLI:
                 print(Colors.error(f"❌ Error checking {package_name}: {e}"))
             return []
     
-    def scan_packages_parallel(self, packages: List[str]) -> List[Dict]:
-        """Enhanced parallel package scanning with better error handling"""
-        vulnerabilities = []
+    def scan_packages_parallel(self, packages: List[str], scan_dependencies: bool = True) -> Tuple[List[Dict], Dict[str, Any]]:
+        """Enhanced parallel package scanning with dependency checking"""
+        all_vulnerabilities = []
         failed_packages = []
         start_time = time.time()
         
-        # Limit concurrent requests to avoid overwhelming APIs
+        # Track scanned packages to avoid duplicates
+        scanned_packages = set()
+        packages_to_scan = list(packages)
+        dependency_map = {}  # Track package -> dependencies
+        
+        # Statistics tracking
+        stats = {
+            'total_packages': 0,
+            'total_dependencies': 0,
+            'vulnerable_packages': set(),
+            'vulnerable_dependencies': set(),
+            'safe_packages': set(),
+            'safe_dependencies': set(),
+            'failed_packages': [],
+            'scan_time': 0,
+            'dependency_depth': {}
+        }
+        
+        # Process packages including dependencies
+        while packages_to_scan:
+            current_batch = []
+            
+            # Get next batch of unscanned packages
+            for pkg in packages_to_scan[:]:
+                if pkg not in scanned_packages:
+                    current_batch.append(pkg)
+                    scanned_packages.add(pkg)
+                    packages_to_scan.remove(pkg)
+            
+            if not current_batch:
+                break
+            
+            # Progress message
+            if not self.config.quiet:
+                if len(scanned_packages) > len(packages):
+                    print(Colors.info(f"📦 Scanning {len(current_batch)} packages (including dependencies)..."))
+            
+            # Scan current batch
+            batch_vulns, batch_failed = self._scan_batch_parallel(current_batch, scanned_packages)
+            all_vulnerabilities.extend(batch_vulns)
+            failed_packages.extend(batch_failed)
+            
+            # Fetch dependencies if enabled
+            if scan_dependencies and not self._interrupted:
+                for pkg in current_batch:
+                    if pkg in batch_failed:
+                        continue
+                        
+                    # Parse package name and version
+                    package_name, version = self._parse_package_string(pkg)
+                    if package_name and version:
+                        deps = self.fetch_package_dependencies(package_name, version)
+                        if deps:
+                            dependency_map[pkg] = []
+                            for dep in deps:
+                                dep_string = f"{dep['name']}.{dep['version']}"
+                                dependency_map[pkg].append(dep_string)
+                                if dep_string not in scanned_packages:
+                                    packages_to_scan.append(dep_string)
+                                    if not self.config.quiet and self.config.verbose:
+                                        print(Colors.info(f"  → Found dependency: {dep_string}"))
+        
+        # Calculate statistics
+        stats['total_packages'] = len(packages)
+        stats['total_dependencies'] = len(scanned_packages) - len(packages)
+        stats['failed_packages'] = failed_packages
+        stats['scan_time'] = time.time() - start_time
+        
+        # Categorize packages
+        vuln_packages = set()
+        for v in all_vulnerabilities:
+            # Extract base package name without version for matching
+            pkg_full = v.get('package', '')
+            vuln_packages.add(pkg_full)
+            # Also try to match with version
+            if '.' in pkg_full:
+                parts = pkg_full.split('.')
+                if parts[-1].replace('.', '').isdigit():
+                    base_name = '.'.join(parts[:-1])
+                    vuln_packages.add(base_name)
+        
+        for pkg in packages:
+            pkg_base = pkg
+            if '.' in pkg:
+                parts = pkg.split('.')
+                if parts[-1].replace('.', '').isdigit():
+                    pkg_base = '.'.join(parts[:-1])
+            
+            if pkg in vuln_packages or pkg_base in vuln_packages:
+                stats['vulnerable_packages'].add(pkg)
+            elif pkg not in failed_packages:
+                stats['safe_packages'].add(pkg)
+        
+        # Categorize dependencies
+        for pkg in scanned_packages:
+            if pkg not in packages and pkg not in failed_packages:
+                if pkg in vuln_packages:
+                    stats['vulnerable_dependencies'].add(pkg)
+                else:
+                    stats['safe_dependencies'].add(pkg)
+        
+        # Summary
+        if not self.config.quiet:
+            print(Colors.info(f"⚙️  Total scan completed in {stats['scan_time']:.2f}s"))
+            print(Colors.info(f"📊 Scanned {len(scanned_packages)} total packages ({stats['total_packages']} main + {stats['total_dependencies']} dependencies)"))
+            
+            if failed_packages:
+                print(Colors.warning(f"⚠️  Failed to scan {len(failed_packages)} packages"))
+        
+        return all_vulnerabilities, stats
+    
+    def _scan_batch_parallel(self, packages: List[str], scanned_packages: set) -> Tuple[List[Dict], List[str]]:
+        """Scan a batch of packages in parallel"""
+        vulnerabilities = []
+        failed_packages = []
+        
+        # Limit concurrent requests
         max_workers = min(self.config.max_workers, self.config.max_concurrent_requests)
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -581,18 +797,17 @@ class EnhancedNuGetCLI:
                 for pkg in packages
             }
             
-            # Setup simple progress tracking
+            # Setup progress tracking
             progress_bar = None
-            if not self.config.quiet and self.config.enable_progress_bar:
+            if not self.config.quiet and self.config.enable_progress_bar and len(packages) > 1:
                 progress_bar = SimpleProgressBar(
                     total=len(packages),
-                    desc="🔍 Scanning packages"
+                    desc="🔍 Scanning batch"
                 )
             
             completed_count = 0
             for future in as_completed(future_to_package):
                 if self._interrupted:
-                    # Cancel remaining futures
                     for f in future_to_package:
                         f.cancel()
                     break
@@ -619,16 +834,23 @@ class EnhancedNuGetCLI:
             if progress_bar:
                 progress_bar.finish()
         
-        # Summary of scan results
-        duration = time.time() - start_time
-        if not self.config.quiet:
-            success_rate = ((len(packages) - len(failed_packages)) / len(packages)) * 100
-            print(Colors.info(f"⚙️  Scan completed in {duration:.2f}s (success rate: {success_rate:.1f}%)"))
-            
-            if failed_packages:
-                print(Colors.warning(f"⚠️  Failed to scan {len(failed_packages)} packages: {', '.join(failed_packages[:5])}{'...' if len(failed_packages) > 5 else ''}"))
+        return vulnerabilities, failed_packages
+    
+    def _parse_package_string(self, package_string: str) -> Tuple[Optional[str], Optional[str]]:
+        """Parse package string to extract name and version"""
+        # Handle various formats: package.version, package-version, package/version
+        patterns = [
+            r'^(.+?)\.(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)$',  # package.version
+            r'^(.+?)-(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)$',   # package-version
+            r'^(.+?)/(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)$',   # package/version
+        ]
         
-        return vulnerabilities
+        for pattern in patterns:
+            match = re.match(pattern, package_string)
+            if match:
+                return match.group(1), match.group(2)
+        
+        return None, None
     
     def filter_vulnerabilities(self, vulnerabilities: List[Dict], 
                              severity_filter: Optional[str] = None,
@@ -901,24 +1123,22 @@ class EnhancedNuGetCLI:
         }
         return severity_colors.get(severity.upper(), Colors.WHITE)
     
-    def display_summary(self, vulnerabilities: List[Dict], packages_count: int):
+    def display_summary(self, vulnerabilities: List[Dict], scan_stats: Dict[str, Any]):
         """Enhanced display scan summary with detailed statistics"""
         print("\n" + "="*80)
         print(Colors.info(Colors.BOLD + "📊 COMPREHENSIVE SCAN SUMMARY"))
         print("="*80)
         
-        # Statistics
+        # Extract statistics
         total_vulns = len(vulnerabilities)
         severity_counts = {}
         sources = set()
-        packages_with_vulns = set()
         cve_years = {}
         
         for vuln in vulnerabilities:
             severity = vuln.get('severity', 'UNKNOWN').upper()
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
             sources.add(vuln.get('source', 'Unknown'))
-            packages_with_vulns.add(vuln.get('package', 'Unknown'))
             
             # Extract year from CVE ID
             cve_id = vuln.get('cve_id', '')
@@ -929,13 +1149,40 @@ class EnhancedNuGetCLI:
                 except:
                     pass
         
-        # Basic statistics
-        safe_packages = packages_count - len(packages_with_vulns)
-        print(f"📦 Packages scanned: {Colors.BOLD}{packages_count}{Colors.RESET}")
-        print(f"✅ Safe packages: {Colors.GREEN}{Colors.BOLD}{safe_packages}{Colors.RESET}")
-        print(f"⚠️  Vulnerable packages: {Colors.RED}{Colors.BOLD}{len(packages_with_vulns)}{Colors.RESET}")
-        print(f"🔍 Total vulnerabilities: {Colors.BOLD}{total_vulns}{Colors.RESET}")
-        print(f"🌐 Data sources: {Colors.BOLD}{', '.join(sorted(sources))}{Colors.RESET}")
+        # Display main statistics table
+        print(f"\n{Colors.BOLD}📋 PACKAGE STATISTICS{Colors.RESET}")
+        print("┌─────────────────────────────┬──────────┬──────────────┬─────────────┐")
+        print("│ Category                    │   Count  │ Vulnerable   │    Safe     │")
+        print("├─────────────────────────────┼──────────┼──────────────┼─────────────┤")
+        print(f"│ Main Packages              │    {scan_stats['total_packages']:>5} │ {Colors.RED}{len(scan_stats['vulnerable_packages']):>11}{Colors.RESET}  │ {Colors.GREEN}{len(scan_stats['safe_packages']):>11}{Colors.RESET} │")
+        print(f"│ Dependencies               │    {scan_stats['total_dependencies']:>5} │ {Colors.RED}{len(scan_stats['vulnerable_dependencies']):>11}{Colors.RESET}  │ {Colors.GREEN}{len(scan_stats['safe_dependencies']):>11}{Colors.RESET} │")
+        print("├─────────────────────────────┼──────────┼──────────────┼─────────────┤")
+        total_scanned = scan_stats['total_packages'] + scan_stats['total_dependencies']
+        total_vulnerable = len(scan_stats['vulnerable_packages']) + len(scan_stats['vulnerable_dependencies'])
+        total_safe = len(scan_stats['safe_packages']) + len(scan_stats['safe_dependencies'])
+        print(f"│ {Colors.BOLD}TOTAL{Colors.RESET}                       │ {Colors.BOLD}{total_scanned:>8}{Colors.RESET} │ {Colors.RED}{Colors.BOLD}{total_vulnerable:>11}{Colors.RESET}  │ {Colors.GREEN}{Colors.BOLD}{total_safe:>11}{Colors.RESET} │")
+        print("└─────────────────────────────┴──────────┴──────────────┴─────────────┘")
+        
+        # Display vulnerability statistics
+        if total_vulns > 0:
+            print(f"\n{Colors.BOLD}🚨 VULNERABILITY BREAKDOWN{Colors.RESET}")
+            print("┌─────────────────────────────┬──────────┬─────────────────────────┐")
+            print("│ Severity                    │   Count  │       Percentage        │")
+            print("├─────────────────────────────┼──────────┼─────────────────────────┤")
+            for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN']:
+                count = severity_counts.get(severity, 0)
+                if count > 0:
+                    percentage = (count / total_vulns) * 100
+                    color = self.get_severity_color(severity)
+                    bar_length = int(percentage / 5)  # Max 20 chars for 100%
+                    bar = '█' * bar_length + '░' * (20 - bar_length)
+                    print(f"│ {color}{severity:<27}{Colors.RESET} │ {count:>8} │ {bar} {percentage:>5.1f}% │")
+            print("├─────────────────────────────┼──────────┼─────────────────────────┤")
+            print(f"│ {Colors.BOLD}TOTAL VULNERABILITIES{Colors.RESET}       │ {Colors.BOLD}{total_vulns:>8}{Colors.RESET} │                         │")
+            print("└─────────────────────────────┴──────────┴─────────────────────────┘")
+        
+        # Data sources
+        print(f"\n🌐 Data sources used: {Colors.BOLD}{', '.join(sorted(sources)) if sources else 'None'}{Colors.RESET}")
         
         # Severity distribution with percentages
         if severity_counts:
@@ -995,7 +1242,8 @@ class EnhancedNuGetCLI:
         # Execution time with performance metrics
         if self.start_time:
             duration = time.time() - self.start_time
-            packages_per_second = packages_count / duration if duration > 0 else 0
+            total_scanned = scan_stats['total_packages'] + scan_stats['total_dependencies']
+            packages_per_second = total_scanned / duration if duration > 0 else 0
             print(f"\n⏱️  Performance:")
             print(f"  🕐 Scan duration: {Colors.BOLD}{duration:.2f} seconds{Colors.RESET}")
             print(f"  🚀 Throughput: {Colors.BOLD}{packages_per_second:.1f} packages/second{Colors.RESET}")
@@ -1322,8 +1570,9 @@ class EnhancedNuGetCLI:
                     for pkg in packages:
                         print(f"  • {pkg}")
             
-            # Execute vulnerability check
-            vulnerabilities = self.scan_packages_parallel(packages)
+            # Execute vulnerability check with dependency scanning
+            scan_dependencies = not getattr(args, 'no_dependencies', False)
+            vulnerabilities, scan_stats = self.scan_packages_parallel(packages, scan_dependencies=scan_dependencies)
             
             # Apply filters
             if args.filter_severity or args.filter_cve:
@@ -1336,7 +1585,7 @@ class EnhancedNuGetCLI:
             # Display results
             if not self.config.quiet:
                 self.display_vulnerabilities(vulnerabilities, detailed=self.config.verbose)
-                self.display_summary(vulnerabilities, len(packages))
+                self.display_summary(vulnerabilities, scan_stats)
             
             # Export results
             if args.output:
@@ -1553,6 +1802,8 @@ def main():
     behavior_group = parser.add_argument_group('Behavior Options')
     behavior_group.add_argument('--fail-on-vuln', action='store_true',
                               help='Exit with non-zero code when vulnerabilities found')
+    behavior_group.add_argument('--no-dependencies', action='store_true',
+                              help='Skip scanning package dependencies')
     behavior_group.add_argument('--create-samples', action='store_true',
                               help='Create sample files')
     
