@@ -39,15 +39,39 @@ import configparser
 import sqlite3
 from contextlib import contextmanager
 
+# Import verification and package listing
+print("🔍 Loading NuGet Vulnerability Scanner CLI...")
+print("📦 Imported packages:")
+imported_packages = []
+
+# Standard library imports
+imported_packages.extend([
+    'argparse', 'sys', 'os', 'json', 'csv', 'time', 'ast', 're', 'threading',
+    'hashlib', 'pickle', 'signal', 'platform', 'datetime', 'pathlib', 'typing',
+    'concurrent.futures', 'dataclasses', 'functools', 'configparser', 'sqlite3',
+    'contextlib', 'xml.etree.ElementTree', 'random', 'multiprocessing', 'traceback'
+])
+
+# Third-party imports
 try:
     import requests
-    from tqdm import tqdm
-    from colorama import init, Fore, Style, Back
-    init(autoreset=True)
+    imported_packages.append('requests')
 except ImportError as e:
-    print(f"Missing required dependency: {e}")
-    print("Please install: pip install requests tqdm colorama")
+    print(f"❌ Missing required dependency: {e}")
+    print("Please install: pip install requests")
     sys.exit(1)
+
+# Display imported packages
+for pkg in sorted(imported_packages):
+    print(f"  ✓ {pkg}")
+
+# Display vulnerability checking URLs
+print("\n🌐 Vulnerability sources to be checked:")
+print("  • NVD (National Vulnerability Database): https://services.nvd.nist.gov/rest/json/cves/2.0")
+print("  • OSV (Open Source Vulnerabilities): https://api.osv.dev/v1/query")
+print("  • GitHub Advisory Database: https://api.github.com/graphql")
+print("  • Snyk Vulnerability Database: https://security.snyk.io/package/nuget/")
+print()
 
 from vulnerability_checker_en import VulnerabilityChecker
 
@@ -88,33 +112,111 @@ class Config:
         return cls(**data)
 
 class Colors:
-    """Enhanced terminal color definitions with Colorama"""
-    RED = Fore.RED
-    GREEN = Fore.GREEN
-    YELLOW = Fore.YELLOW
-    BLUE = Fore.BLUE
-    MAGENTA = Fore.MAGENTA
-    CYAN = Fore.CYAN
-    WHITE = Fore.WHITE
-    BOLD = Style.BRIGHT
-    DIM = Style.DIM
-    RESET = Style.RESET_ALL
+    """Terminal color definitions using ANSI escape codes"""
+    # ANSI color codes
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    WHITE = '\033[97m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    RESET = '\033[0m'
     
     @staticmethod
     def error(text: str) -> str:
-        return f"{Fore.RED}{Style.BRIGHT}{text}{Style.RESET_ALL}"
+        return f"{Colors.RED}{Colors.BOLD}{text}{Colors.RESET}"
     
     @staticmethod
     def success(text: str) -> str:
-        return f"{Fore.GREEN}{Style.BRIGHT}{text}{Style.RESET_ALL}"
+        return f"{Colors.GREEN}{Colors.BOLD}{text}{Colors.RESET}"
     
     @staticmethod
     def warning(text: str) -> str:
-        return f"{Fore.YELLOW}{text}{Style.RESET_ALL}"
+        return f"{Colors.YELLOW}{text}{Colors.RESET}"
     
     @staticmethod
     def info(text: str) -> str:
-        return f"{Fore.CYAN}{text}{Style.RESET_ALL}"
+        return f"{Colors.CYAN}{text}{Colors.RESET}"
+
+class SimpleProgressBar:
+    """Simple progress bar implementation without external dependencies"""
+    
+    def __init__(self, total: int, desc: str = "Progress", width: int = 50):
+        self.total = total
+        self.desc = desc
+        self.width = width
+        self.current = 0
+        self.start_time = time.time()
+        self._last_update_time = 0
+        self._update_interval = 0.1  # Update at most every 100ms
+        
+    def update(self, current: int, **kwargs):
+        """Update progress bar with current value and optional stats"""
+        self.current = current
+        current_time = time.time()
+        
+        # Rate limit updates to avoid excessive console output
+        if current_time - self._last_update_time < self._update_interval:
+            return
+            
+        self._last_update_time = current_time
+        self._render(kwargs)
+    
+    def _render(self, stats: dict):
+        """Render the progress bar to console"""
+        if self.total == 0:
+            percent = 100
+        else:
+            percent = int(100 * self.current / self.total)
+        
+        filled = int(self.width * self.current / max(self.total, 1))
+        bar = '█' * filled + '░' * (self.width - filled)
+        
+        elapsed = time.time() - self.start_time
+        if self.current > 0 and elapsed > 0:
+            rate = self.current / elapsed
+            eta = (self.total - self.current) / rate if rate > 0 else 0
+            eta_str = self._format_time(eta)
+        else:
+            eta_str = "--:--"
+        
+        # Build status line with optional stats
+        status_parts = [f"{self.current}/{self.total}"]
+        if 'vulns' in stats:
+            status_parts.append(f"{Colors.RED}vulns: {stats['vulns']}{Colors.RESET}")
+        if 'failed' in stats:
+            status_parts.append(f"{Colors.YELLOW}failed: {stats['failed']}{Colors.RESET}")
+        
+        status = " | ".join(status_parts)
+        
+        # Clear line and print progress
+        sys.stdout.write('\r\033[K')  # Clear line
+        sys.stdout.write(
+            f"{self.desc} |{Colors.CYAN}{bar}{Colors.RESET}| "
+            f"{percent}% {status} ETA: {eta_str}"
+        )
+        sys.stdout.flush()
+    
+    def finish(self):
+        """Complete the progress bar"""
+        self.current = self.total
+        self._render({})
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+    
+    def _format_time(self, seconds: float) -> str:
+        """Format seconds into human-readable time"""
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        elif seconds < 3600:
+            return f"{int(seconds/60)}m {int(seconds%60)}s"
+        else:
+            hours = int(seconds / 3600)
+            minutes = int((seconds % 3600) / 60)
+            return f"{hours}h {minutes}m"
 
 class CacheManager:
     """Enhanced SQLite-based cache manager for vulnerability data"""
@@ -474,15 +576,12 @@ class EnhancedNuGetCLI:
                 for pkg in packages
             }
             
-            # Setup progress bar
+            # Setup simple progress tracking
             progress_bar = None
             if not self.config.quiet and self.config.enable_progress_bar:
-                progress_bar = tqdm(
+                progress_bar = SimpleProgressBar(
                     total=len(packages),
-                    desc="🔍 Scanning packages",
-                    unit="pkg",
-                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
-                    colour='cyan'
+                    desc="🔍 Scanning packages"
                 )
             
             completed_count = 0
@@ -500,21 +599,20 @@ class EnhancedNuGetCLI:
                     result = future.result(timeout=self.config.timeout)
                     if result:
                         vulnerabilities.extend(result)
-                        if progress_bar:
-                            progress_bar.set_postfix({
-                                'vulns': len(vulnerabilities),
-                                'failed': len(failed_packages)
-                            })
                 except Exception as e:
                     failed_packages.append(package)
                     if not self.config.quiet:
                         print(Colors.error(f"❌ Error scanning {package}: {e}"))
                 
                 if progress_bar:
-                    progress_bar.update(1)
+                    progress_bar.update(
+                        completed_count,
+                        vulns=len(vulnerabilities),
+                        failed=len(failed_packages)
+                    )
             
             if progress_bar:
-                progress_bar.close()
+                progress_bar.finish()
         
         # Summary of scan results
         duration = time.time() - start_time
