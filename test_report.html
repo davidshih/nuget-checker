@@ -1,0 +1,1145 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Software Vulnerability Scan Report</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #2c3e50; margin-bottom: 10px; }
+        .summary { background: #ecf0f1; padding: 20px; border-radius: 5px; margin-bottom: 30px; }
+        .vulnerability { border: 1px solid #ddd; margin-bottom: 20px; border-radius: 5px; overflow: hidden; }
+        .vuln-header { padding: 15px; font-weight: bold; background: #f8f9fa; }
+        .vuln-body { padding: 20px; }
+        .critical { border-left: 5px solid #dc3545; }
+        .high { border-left: 5px solid #fd7e14; }
+        .medium { border-left: 5px solid #ffc107; }
+        .low { border-left: 5px solid #28a745; }
+        .severity-critical { background-color: #dc3545; color: white; }
+        .severity-high { background-color: #fd7e14; color: white; }
+        .severity-medium { background-color: #ffc107; color: black; }
+        .severity-low { background-color: #28a745; color: white; }
+        .badge { padding: 4px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; margin-right: 10px; }
+        .software-group { margin-bottom: 30px; }
+        .software-title { background: #343a40; color: white; padding: 10px 15px; margin: 0; font-size: 18px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Software Vulnerability Scan Report</h1>
+            <p>Generated on: 2025-08-20 06:50:16</p>
+        </div>
+        
+        <div class="summary">
+            <h3>📊 Scan Summary</h3>
+            <p><strong>Total Vulnerabilities Found:</strong> 131</p>
+            <p><strong>Affected Software:</strong> 4</p>
+            <p><strong>Severity Distribution:</strong> CRITICAL: 29, HIGH: 81, MEDIUM: 20, LOW: 1</p>
+        </div>
+        
+        <div class="vulnerabilities">
+            <h3>🚨 Vulnerability Details</h3>
+            
+            <div class="software-group">
+                <h4 class="software-title">📦 Adobe Photoshop CC 24.6</h4>
+                <table>
+                    <tr>
+                        <th>CVE ID</th>
+                        <th>CVSS Score</th>
+                        <th>Severity</th>
+                        <th>Affected Versions</th>
+                        <th>Link</th>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>CVE-2015-3109</strong></td>
+                        <td>10.0</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 15.2.2, < 16.0</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-3109" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-3110</strong></td>
+                        <td>10.0</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 15.2.2, <= 6.1, < 16.0, < 6.11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-3110" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-3111</strong></td>
+                        <td>10.0</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 6.1, <= 15.2.2, < 16.0, < 6.11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-3111" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-3112</strong></td>
+                        <td>10.0</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 6.1, <= 15.2.2, < 16.0, < 6.11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-3112" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0951</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 6.1, <= 16.1.1, < 15.2.4, < 16.1.2, < 6.2</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0951" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0952</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 6.1, <= 16.1.1, < 15.2.4, < 16.1.2, < 6.2</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0952" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0953</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 6.1, <= 16.1.1, < 15.2.4, < 16.1.2, < 6.2</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0953" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2018-12810</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td>>= 19.0.0 <= 19.1.5, >= 18.0.0 <= 18.1.5, < 19.1.6, < 18.1.6</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-12810" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2018-12811</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td>>= 19.0.0 <= 19.1.5, >= 18.0.0 <= 18.1.5, < 19.1.6, < 18.1.6</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-12811" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7094</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.7, >= 20.0 <= 20.0.2</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7094" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7968</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7968" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7969</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7969" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7970</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7970" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7971</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7971" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7972</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7972" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7973</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7973" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7974</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7974" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7975</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7975" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7990</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7990" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7992</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7992" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7993</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7993" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7997</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7997" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7998</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7998" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-8001</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-8001" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2018-4946</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>>= 19.0.0 <= 19.1.3, >= 18.1.1 <= 18.1.3, >= 18.1.1 <= 18.1.2, < 19.1.3</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-4946" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7976</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7976" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7978</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7978" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7979</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7979" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7980</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7980" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7982</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7982" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7983</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7983" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7984</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7984" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7985</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7985" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7986</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7986" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7988</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7988" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7989</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7989" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7991</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7991" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7994</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7994" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7995</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7995" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7996</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7996" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2017-3004</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>>= 17.0 <= 17.0.1, >= 18.0 <= 18.0.1</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2017-3004" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2017-3005</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>>= 17.0 <= 17.0.1, >= 18.0 <= 18.0.1</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2017-3005" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-8253</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>>= 20.0.0 <= 20.0.7, >= 21.0.0 <= 21.0.1, < 20.0.8, < 21.0.2</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-8253" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-8254</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>>= 20.0.0 <= 20.0.7, >= 21.0.0 <= 21.0.1, < 20.0.8, < 21.0.2</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-8254" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2018-15980</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 19.1.6, < 19.1.6</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-15980" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7977</strong></td>
+                        <td>6.5</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7977" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7981</strong></td>
+                        <td>6.5</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7981" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7987</strong></td>
+                        <td>6.5</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7987" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-7999</strong></td>
+                        <td>6.5</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-7999" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2019-8000</strong></td>
+                        <td>6.5</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 19.1.8, >= 20.0 <= 20.0.5, < 19.1.8</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-8000" target="_blank">View Details</a></td>
+                    </tr>
+                </table></div>
+            <div class="software-group">
+                <h4 class="software-title">📦 Adobe Creative Cloud desktop app 6.7</h4>
+                <table>
+                    <tr>
+                        <th>CVE ID</th>
+                        <th>CVSS Score</th>
+                        <th>Severity</th>
+                        <th>Affected Versions</th>
+                        <th>Link</th>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>CVE-2018-4991</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 4.4.1.298, < 4.4.1.298</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-4991" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2018-12829</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td>< 4.6.1, < 4.6.1</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-12829" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2020-9669</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 5.1, < 5.1</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2020-9669" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2020-9670</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 5.1, < 5.1</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2020-9670" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2020-9671</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 5.1, < 5.1</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2020-9671" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2020-9682</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 5.1, < 5.1</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2020-9682" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-1034</strong></td>
+                        <td>9.1</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td><= 3.5.1.209, < 3.6.0.244</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-1034" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2017-3006</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 3.9.5.353, < 3.9.5.353</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2017-3006" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-6935</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 3.7.0.272, < 3.8.0.310</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-6935" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2017-3007</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 3.9.5.353, < 3.9.5.353</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2017-3007" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2018-4873</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 4.4.1.298, < 4.4.1.298</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-4873" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2018-4992</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 4.4.1.298, < 4.4.1.298</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-4992" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2018-5003</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 4.5.5.342, < 4.5.5.342</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2018-5003" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-21069</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 5.3</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-21069" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-28594</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 2.5</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-28594" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-28547</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 5.3</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-28547" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-28613</strong></td>
+                        <td>7.4</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 5.4</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-28613" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-4157</strong></td>
+                        <td>7.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 3.6.0.248, < 3.7.0.272</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-4157" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-4158</strong></td>
+                        <td>7.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 3.6.0.248, < 3.7.0.272</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-4158" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2020-24422</strong></td>
+                        <td>7.0</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td><= 2.1, >= 5.0 <= 5.2</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2020-24422" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-21078</strong></td>
+                        <td>6.5</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 5.3</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-21078" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-21068</strong></td>
+                        <td>6.1</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 5.3</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-21068" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-28633</strong></td>
+                        <td>6.1</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 2.4</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-28633" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-43017</strong></td>
+                        <td>4.2</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td><= 5.5</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-43017" target="_blank">View Details</a></td>
+                    </tr>
+                </table></div>
+            <div class="software-group">
+                <h4 class="software-title">📦 Citrix Workspace app for Windows 24.5</h4>
+                <table>
+                    <tr>
+                        <th>CVE ID</th>
+                        <th>CVSS Score</th>
+                        <th>Severity</th>
+                        <th>Affected Versions</th>
+                        <th>Link</th>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>CVE-2019-11634</strong></td>
+                        <td>9.8</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td>< 1904, < 1904</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2019-11634" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2020-8207</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2020-8207" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2021-22907</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 19.12.4000, < 2105, < 2105</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2021-22907" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2024-6286</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 2203.1, < 2403.1</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2024-6286" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2025-4879</strong></td>
+                        <td>7.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 2402, < 2409</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2025-4879" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2024-7889</strong></td>
+                        <td>7.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 2203.1, < 2405</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2024-7889" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2024-7890</strong></td>
+                        <td>7.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 2203.1, < 2405</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2024-7890" target="_blank">View Details</a></td>
+                    </tr>
+                </table></div>
+            <div class="software-group">
+                <h4 class="software-title">📦 Microsoft Edge 134.0</h4>
+                <table>
+                    <tr>
+                        <th>CVE ID</th>
+                        <th>CVSS Score</th>
+                        <th>Severity</th>
+                        <th>Affected Versions</th>
+                        <th>Link</th>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>CVE-2016-0003</strong></td>
+                        <td>9.6</td>
+                        <td><span class="badge severity-critical">CRITICAL</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0003" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-2441</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-2441" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-2442</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-2442" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-2446</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-2446" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-2485</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-2485" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-2486</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-2486" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-2494</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-2494" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-2542</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-2542" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6064</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6064" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6073</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6073" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6078</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6078" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6139</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6139" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6140</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6140" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6142</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6142" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6148</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6148" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6151</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6151" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6153</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6153" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6154</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6154" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6155</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6155" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6158</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6158" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6159</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6159" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6168</strong></td>
+                        <td>9.3</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6168" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0024</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0024" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0060</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0060" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0061</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0061" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0062</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0062" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0084</strong></td>
+                        <td>8.8</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0084" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0102</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0102" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0105</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0105" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0109</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0109" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0110</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0110" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0111</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0111" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0116</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0116" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0123</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0123" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0124</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0124" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0129</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0129" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0130</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0130" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0154</strong></td>
+                        <td>7.5</td>
+                        <td><span class="badge severity-high">HIGH</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0154" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6170</strong></td>
+                        <td>6.8</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6170" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6057</strong></td>
+                        <td>5.0</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6057" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-2449</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-2449" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6058</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6058" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6088</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6088" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6144</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6144" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6161</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6161" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6169</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6169" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2015-6176</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2015-6176" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0077</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>< 11</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0077" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0080</strong></td>
+                        <td>4.3</td>
+                        <td><span class="badge severity-medium">MEDIUM</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0080" target="_blank">View Details</a></td>
+                    </tr>
+                
+                    <tr>
+                        <td><strong>CVE-2016-0125</strong></td>
+                        <td>3.1</td>
+                        <td><span class="badge severity-low">LOW</span></td>
+                        <td>Check CVE details</td>
+                        <td><a href="https://nvd.nist.gov/vuln/detail/CVE-2016-0125" target="_blank">View Details</a></td>
+                    </tr>
+                </table></div>
+        </div>
+    </div>
+</body>
+</html>
